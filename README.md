@@ -18,7 +18,7 @@ full screen and works offline at the track.
   changed cells highlighted.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "Copy setup from …" copies the previous session; "New event from this setup" starts the next event.
-- **Reference**: caster calculator, stub position diagram, sign conventions.
+- **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.
 - **Backup**: data lives on the phone; export and import a JSON backup from the Events screen.
 
 ## Publishing to GitHub Pages

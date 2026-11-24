@@ -33,22 +33,15 @@ function route() {
     if (parts[2] && m.sessions.some((s) => s.id === parts[2])) ui.session = parts[2];
     if (!m.sessions.some((s) => s.id === ui.session)) ui.session = m.sessions[0].id;
     renderMeeting(m);
-  } else if (parts[0] === 'ref') {
-    renderRef();
   } else {
     renderHome();
   }
   window.scrollTo(0, 0);
 }
-window.addEventListener('hashchange', route);
-
-function topNav(active) {
-  $nav.className = '';
-  $nav.innerHTML = `
-    <button data-go="#/" class="${active === 'setup' ? 'act' : ''}">Setup</button>
-    <button data-go="#/ref" class="${active === 'ref' ? 'act' : ''}">Reference</button>`;
-  $nav.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { location.hash = b.dataset.go; });
-}
+window.addEventListener('hashchange', () => {
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  route();
+});
 
 function openSession(m, sid) {
   ui.view = 'session';
@@ -60,7 +53,7 @@ function openSession(m, sid) {
 // ---------- Home ----------
 function renderHome() {
   $hdr.innerHTML = `${LOGO}<h1>KARTIFY</h1><button id="new" class="pri sm">+ New event</button>`;
-  topNav('setup');
+  $nav.className = ''; $nav.innerHTML = '';
   const meetings = [...state.meetings].sort((a, b) =>
     (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
 
@@ -218,8 +211,54 @@ function selectHTML(fieldId, key, options, current, aria) {
 }
 
 function labelHTML(f) {
-  return `<div class="flabel">${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}
-    ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
+  const inner = `${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}${f.ref ? ' <span class="info">i</span>' : ''}
+    ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}`;
+  return f.ref
+    ? `<button class="flabel ref" data-ref="${f.ref}" aria-label="${esc(f.label)} reference">${inner}</button>`
+    : `<div class="flabel">${inner}</div>`;
+}
+
+// ---------- Reference content (Reference tab and pop-ups from the setup) ----------
+function stubHTML(selected = '', pickable = false) {
+  const areas = { 1: 'a', 2: 'b', 3: 'c', 4: 'd', 5: 'e' };
+  return `<div class="stub">${Object.entries(areas).map(([n, a]) => pickable
+    ? `<button style="grid-area:${a}" data-pick="${n}" class="${String(selected) === n ? 'act' : ''}">${n}</button>`
+    : `<span style="grid-area:${a}">${n}</span>`).join('')}</div>`;
+}
+
+// Every top/bottom combination; tap a cell to pick it when `pickable`.
+function casterTableHTML(top = '', bottom = '', pickable = false) {
+  return `<table class="caster-table">
+    <tr><th>Top</th>${CASTER_BOTTOM.map((b) => `<th>${b}</th>`).join('')}</tr>
+    ${CASTER_TOP.map((t) => `<tr><th>${signed(t)}</th>${CASTER_BOTTOM.map((b) => {
+      const on = String(t) === String(top) && b === bottom;
+      const deg = casterDegrees(t, b).toFixed(1) + '°';
+      return `<td class="${on ? 'act' : ''}">${pickable ? `<button data-top="${t}" data-bottom="${b}">${deg}</button>` : deg}</td>`;
+    }).join('')}</tr>`).join('')}
+  </table>`;
+}
+
+const BRAKE_HTML = `<div class="brake"><b>1</b> = top position</div>`;
+
+function openRefSheet(ref, m, s, onPick) {
+  let body = '';
+  if (ref === 'stub') {
+    body = `<h3>Stub position (LHS)</h3>${stubHTML(s.values.stubPos?.f || '', true)}
+      <div class="mute" style="text-align:center">Tap a position to select it.</div>`;
+  } else if (ref === 'caster') {
+    const { top, bottom } = store.getCaster(s);
+    body = `<h3>Caster</h3>
+      <div class="mute">16.5° base, +3° when bottom is BACK, plus top position. Tap a value to select it.</div>
+      ${casterTableHTML(top, bottom, true)}`;
+  } else if (ref === 'brake') {
+    body = `<h3>Brake pedal</h3>${BRAKE_HTML}`;
+  }
+  const d = sheet(`<div class="sheet-body">${body}<button data-a="close">Close</button></div>`);
+  d.querySelector('[data-a=close]').onclick = () => d.close();
+  d.querySelectorAll('[data-pick]').forEach((b) => b.onclick = () => { d.close(); onPick({ stubPos: b.dataset.pick }); });
+  d.querySelectorAll('[data-top]').forEach((b) => b.onclick = () => {
+    d.close(); onPick({ casterTop: b.dataset.top, casterBottom: b.dataset.bottom });
+  });
 }
 
 function rowHTML(f, s) {
@@ -344,6 +383,21 @@ function renderSessionForm(m, s) {
     const [fid, key] = sel.dataset.select.split(':');
     sel.onchange = () => setPart(fid, key, sel.value);
   });
+
+  // Tap a row name with an ⓘ to see its reference; picks made there fill the row.
+  $app.querySelectorAll('[data-ref]').forEach((b) => b.onclick = () => openRefSheet(b.dataset.ref, m, s, (pick) => {
+    if (pick.stubPos) {
+      $app.querySelector('[data-select="stubPos:f"]').value = pick.stubPos;
+      setPart('stubPos', 'f', pick.stubPos);
+    }
+    if (pick.casterTop != null) {
+      s.values.caster = { top: pick.casterTop, bottom: pick.casterBottom };
+      $app.querySelector('[data-select="caster:top"]').value = pick.casterTop;
+      $app.querySelectorAll('[data-choice="caster:bottom"] button').forEach((x) =>
+        x.classList.toggle('act', x.dataset.v === pick.casterBottom));
+      setPart('caster', 'bottom', pick.casterBottom);
+    }
+  }));
 
   document.getElementById('saveSetup').onclick = () => saveSetupSheet(m, s);
   document.getElementById('loadSetup').onclick = () => loadSetupSheet(m, s);
@@ -586,45 +640,6 @@ function carryForward(m) {
   location.hash = `#/m/${n.id}`;
   setTimeout(() => openDetails(n, true), 50);
   if (last) toast(`First session pre-filled from ${label(m, last)}`);
-}
-
-// ---------- Reference ----------
-function renderRef() {
-  $hdr.innerHTML = `${LOGO}<h1>KARTIFY</h1>`;
-  topNav('ref');
-  $app.innerHTML = `
-    <div class="card">
-      <h3>Caster</h3>
-      <label>Top<select id="rTop">${CASTER_TOP.map((o) =>
-        `<option value="${o}" ${o === 0 ? 'selected' : ''}>${signed(o)}</option>`).join('')}</select></label>
-      <label>Bottom<div class="seg" id="rBottom">${CASTER_BOTTOM.map((t) =>
-        `<button data-v="${t}" class="${t === 'BACK' ? 'act' : ''}">${t}</button>`).join('')}</div></label>
-      <div class="res" id="rOut"></div>
-      <div class="mute" style="text-align:center">16.5° base, +3° when bottom is BACK, plus top position.</div>
-    </div>
-    <div class="card">
-      <h3>Stub position (LHS)</h3>
-      <div class="stub">
-        <span style="grid-area:a">1</span><span style="grid-area:b">2</span><span style="grid-area:c">3</span>
-        <span style="grid-area:d">4</span><span style="grid-area:e">5</span>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Brake position</h3>
-      <table>
-        <tr><td>Brake pos</td><td colspan="2"><b>1</b> = top</td></tr>
-      </table>
-    </div>`;
-  let bottom = 'BACK';
-  const top = document.getElementById('rTop');
-  const update = () => { document.getElementById('rOut').textContent = casterDegrees(top.value, bottom).toFixed(1) + '°'; };
-  document.querySelectorAll('#rBottom button').forEach((b) => b.onclick = () => {
-    bottom = b.dataset.v;
-    document.querySelectorAll('#rBottom button').forEach((x) => x.classList.toggle('act', x === b));
-    update();
-  });
-  top.onchange = update;
-  update();
 }
 
 // ---------- Misc ----------
