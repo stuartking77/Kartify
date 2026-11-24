@@ -16,6 +16,8 @@ full screen and works offline at the track.
 - **Changes record**: each session shows what changed from the previous one. The *Changes* view
   lists the whole event in order, and the *Grid* view shows every session side by side with
   changed cells highlighted.
+- **Automatic carry-over**: opening the session after one with a setup fills in that setup, so you
+  only change what's different. It doesn't count as used until you edit something in it.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "Copy setup from …" copies the previous session; "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.

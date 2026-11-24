@@ -88,8 +88,13 @@ export function display(session, field, side = 'v', long = false) {
   return getVal(session, field, side);
 }
 
+export function hasSetup(session) {
+  return FIELDS.some((f) => f.sides.some((side) => display(session, f, side)));
+}
+
+// A session whose setup was only carried over (not edited) doesn't count as used.
 export function sessionHasData(session) {
-  if (!session) return false;
+  if (!session || session.inherited) return false;
   if (session.notes && session.notes.trim()) return true;
   if (TIMES.some((t) => getVal(session, t))) return true;
   return FIELDS.some((f) => f.sides.some((side) => display(session, f, side)));

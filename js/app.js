@@ -22,7 +22,24 @@ function fmtDate(iso) {
 const findMeeting = (id) => state.meetings.find((m) => m.id === id);
 const label = (m, s) => store.sessionLabel(m, s);
 const tabName = (m, s) => s.name.trim() || store.defaultSessionName(m, s);
-function touch(m) { m.updatedAt = Date.now(); store.save(state); }
+// Any edit to a session makes its carried-over setup its own (see carryOver).
+function touch(m, s) {
+  if (s && s.inherited) { delete s.inherited; markChip(m, s); }
+  m.updatedAt = Date.now();
+  store.save(state);
+}
+
+// Opening the session straight after one with a setup fills in that setup, so only
+// changes need entering. It stays "carried over" (not counted as used, refreshed from
+// the previous session each time it's opened) until something in it is edited.
+function carryOver(m, s) {
+  const before = m.sessions[m.sessions.indexOf(s) - 1];
+  if (!before || before.inherited || !store.hasSetup(before)) return;
+  if (!s.inherited && store.sessionHasData(s)) return;
+  store.applySetup(s, before.values);
+  s.inherited = true;
+  store.save(state);
+}
 
 // ---------- Router ----------
 function route() {
@@ -308,6 +325,7 @@ function rowHTML(f, s) {
 }
 
 function renderSessionForm(m, s) {
+  carryOver(m, s);
   const prev = previousFilled(m, s);
 
   $app.innerHTML = `
@@ -320,7 +338,7 @@ function renderSessionForm(m, s) {
           <input data-time="${t.id}" value="${esc(store.getVal(s, t))}" inputmode="decimal" autocomplete="off" placeholder="–"></label>`).join('')}
     </div>
     <div class="row">
-      ${prev ? `<button id="copyPrev" style="flex:1 1 100%">Copy setup from ${esc(label(m, prev))}</button>` : ''}
+      ${prev && !s.inherited ? `<button id="copyPrev" style="flex:1 1 100%">Copy setup from ${esc(label(m, prev))}</button>` : ''}
       <button id="saveSetup" style="flex:1">Save setup</button>
       <button id="loadSetup" style="flex:1">Load setup</button>
     </div>
@@ -334,12 +352,12 @@ function renderSessionForm(m, s) {
       <textarea id="notes" rows="5" placeholder="How did it feel? What changed?">${esc(s.notes)}</textarea>
     </div>`;
 
-  const changed = () => { touch(m); markChip(m, s); renderChanges(m, s, prev); };
+  const changed = () => { touch(m, s); markChip(m, s); renderChanges(m, s, prev); };
 
   // Session name: blank by default; the next session's tab follows it ("Test 1" -> "Test 2").
   document.getElementById('sessName').addEventListener('input', (e) => {
     s.name = e.target.value;
-    touch(m);
+    touch(m, s);
     const i = m.sessions.indexOf(s);
     for (const x of m.sessions.slice(i, i + 2)) {
       const b = $nav.querySelector(`[data-s="${x.id}"]`);
@@ -358,7 +376,7 @@ function renderSessionForm(m, s) {
   $app.querySelectorAll('input[data-time]').forEach((el) => {
     el.addEventListener('input', () => {
       store.setVal(s, TIMES.find((t) => t.id === el.dataset.time), 'v', el.value.trim());
-      touch(m); markChip(m, s);
+      touch(m, s); markChip(m, s);
     });
     el.addEventListener('focus', () => el.select());
   });
@@ -407,14 +425,14 @@ function renderSessionForm(m, s) {
 
   renderChanges(m, s, prev);
   document.getElementById('notes').addEventListener('input', (e) => {
-    s.notes = e.target.value; touch(m); markChip(m, s);
+    s.notes = e.target.value; touch(m, s); markChip(m, s);
   });
 
-  if (prev) {
+  if (prev && !s.inherited) {
     document.getElementById('copyPrev').onclick = () => {
       if (store.sessionHasData(s) && !confirm(`Replace this setup with ${label(m, prev)}? Times and notes are kept.`)) return;
       store.applySetup(s, prev.values);
-      touch(m);
+      touch(m, s);
       renderMeeting(m);
       toast(`Copied setup from ${label(m, prev)}`);
     };
@@ -438,6 +456,12 @@ function changeListHTML(diffs) {
 function renderChanges(m, s, prev) {
   const el = document.getElementById('changes');
   if (!el) return;
+  if (s.inherited) {
+    const before = m.sessions[m.sessions.indexOf(s) - 1];
+    el.innerHTML = `<div class="card changes-card"><h3>Setup carried over from ${esc(label(m, before))}</h3>
+      <div class="mute">Change only what's different.</div></div>`;
+    return;
+  }
   if (!prev || !store.sessionHasData(s)) { el.innerHTML = ''; return; }
   const diffs = store.diffSessions(prev, s);
   el.innerHTML = `
@@ -479,11 +503,11 @@ function renderGrid(m) {
   const cols = m.sessions;
   // Highlight values that differ from the previous session that had a value.
   const cell = (s, f, side) => {
-    const v = store.display(s, f, side);
+    const v = s.inherited ? '' : store.display(s, f, side);
     let changed = false;
     if (v) {
       for (let j = cols.indexOf(s) - 1; j >= 0; j--) {
-        const pv = store.display(cols[j], f, side);
+        const pv = cols[j].inherited ? '' : store.display(cols[j], f, side);
         if (pv) { changed = pv !== v; break; }
       }
     }
@@ -623,7 +647,7 @@ function loadSetupSheet(m, s) {
     d.close();
     if (store.sessionHasData(s) && !confirm(`Replace this session's setup with "${x.name}"? Times and notes are kept.`)) return;
     store.applySetup(s, x.values);
-    touch(m);
+    touch(m, s);
     store.save(state, true);
     renderMeeting(m);
     toast(`Loaded "${x.name}"`);
