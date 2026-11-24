@@ -657,6 +657,15 @@ document.addEventListener('visibilitychange', () => {
 });
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  // When an updated version installs, reload once so it shows straight away.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    store.save(state, true);
+    location.reload();
+  });
   navigator.serviceWorker.register('./sw.js');
 }
 
