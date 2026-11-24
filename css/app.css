@@ -172,3 +172,11 @@ button.flabel.ref{background:none;border:0;padding:0;text-align:left;color:var(-
 .brake b{color:var(--acc);font-size:28px}
 dialog.sheet{max-height:90vh;overflow:auto}
 nav:empty{display:none}
+
+/* Values carried from earlier sessions (sessions only store what changed) */
+.cell input::placeholder{color:#7d848e;font-weight:500;opacity:1}
+.seg button.inh{border-style:dashed;border-color:rgba(52,211,153,.55);color:rgba(52,211,153,.8)}
+select.inh{color:#7d848e;font-weight:500}
+.caster-out.inh{color:#7d848e}
+.grid td.inh{color:#6b727c}
+.form-foot{padding:8px 0 4px;border-top:1px solid #22262d}

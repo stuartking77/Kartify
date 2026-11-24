@@ -92,9 +92,8 @@ export function hasSetup(session) {
   return FIELDS.some((f) => f.sides.some((side) => display(session, f, side)));
 }
 
-// A session whose setup was only carried over (not edited) doesn't count as used.
 export function sessionHasData(session) {
-  if (!session || session.inherited) return false;
+  if (!session) return false;
   if (session.notes && session.notes.trim()) return true;
   if (TIMES.some((t) => getVal(session, t))) return true;
   return FIELDS.some((f) => f.sides.some((side) => display(session, f, side)));
@@ -113,6 +112,36 @@ export function diffSessions(prev, cur) {
 }
 
 // Setup values only (no lap times), deep-copied.
+// The stored pieces of a field: front/rear values, or number + direction, or caster top + bottom.
+export function partsOf(field) {
+  if (field.kind === 'dir') return ['f', 'd'];
+  if (field.kind === 'caster') return ['top', 'bottom'];
+  return field.sides;
+}
+
+const own = (session, fid, key) => {
+  const v = session?.values[fid]?.[key];
+  return v == null ? '' : String(v);
+};
+
+// Sessions only store what changed. The setup in force at a session is each value as last
+// set in that session or the closest one before it. Pass index -1 for "nothing yet".
+export function effectiveValues(m, index) {
+  const out = {};
+  for (const f of FIELDS) {
+    for (const key of partsOf(f)) {
+      for (let i = index; i >= 0; i--) {
+        const v = own(m.sessions[i], f.id, key);
+        if (v !== '') { (out[f.id] ||= {})[key] = v; break; }
+      }
+    }
+  }
+  return out;
+}
+export const effectiveAt = (m, s) => effectiveValues(m, m.sessions.indexOf(s));
+export const effectiveBefore = (m, s) => effectiveValues(m, m.sessions.indexOf(s) - 1);
+export const hasOwn = (session, field) => partsOf(field).some((k) => own(session, field.id, k) !== '');
+
 export function setupValues(session) {
   const values = JSON.parse(JSON.stringify(session.values));
   for (const t of TIMES) delete values[t.id];
@@ -147,19 +176,35 @@ function upgradeSession(s) {
 
 function normalise(data) {
   const setups = Array.isArray(data?.setups) ? data.setups : [];
-  if (!data || !Array.isArray(data.meetings)) return { version: 2, meetings: [], setups };
+  if (!data || !Array.isArray(data.meetings)) return { version: 3, meetings: [], setups };
   for (const m of data.meetings) {
     if (!Array.isArray(m.sessions)) {
       // v1: fixed sessions keyed t1..f. Keep the ones that were used.
       const old = m.sessions || {};
       m.sessions = LEGACY_SESSIONS.map(([k]) => ({ ...newSession(), values: old[k]?.values || {}, notes: old[k]?.notes || '' }));
     }
-    for (const s of m.sessions) { s.id ||= uid(); s.values ||= {}; s.name ??= ''; s.notes ??= ''; upgradeSession(s); }
+    for (const s of m.sessions) {
+      s.id ||= uid(); s.values ||= {}; s.name ??= ''; s.notes ??= ''; upgradeSession(s);
+      if (s.inherited) { for (const f of FIELDS) delete s.values[f.id]; delete s.inherited; } // old automatic copies
+      delete s.cleared;
+    }
+    // Before version 3 every session held a full setup; keep only what each one changed.
+    if ((data.version || 1) < 3) {
+      for (let i = m.sessions.length - 1; i > 0; i--) {
+        const before = effectiveValues(m, i - 1), s = m.sessions[i];
+        for (const f of FIELDS) {
+          for (const key of partsOf(f)) {
+            if (own(s, f.id, key) !== '' && own(s, f.id, key) === (before[f.id]?.[key] ?? '')) delete s.values[f.id][key];
+          }
+          if (s.values[f.id] && !Object.keys(s.values[f.id]).length) delete s.values[f.id];
+        }
+      }
+    }
     // An earlier version filled in Test 1 … Final when migrating; names should start blank.
     if (m.sessions.map((s) => s.name).join('|') === LEGACY_NAMES) m.sessions.forEach((s) => { s.name = ''; });
     if (!m.sessions.length) m.sessions.push(newSession());
   }
-  return { version: 2, meetings: data.meetings, setups };
+  return { version: 3, meetings: data.meetings, setups };
 }
 
 export function load() {

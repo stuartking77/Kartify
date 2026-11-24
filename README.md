@@ -15,10 +15,11 @@ full screen and works offline at the track.
   stub pos 1–5, wheelbase S/M/L, 3rd IN/OUT (rear), front bar OUT/NYLON/STEEL, pinion 10–14. Caster is entered as top (−4…+4) and bottom (FWD/BACK) positions and the degrees are calculated.
 - **Changes**: each session shows what changed from the previous one, and the *Grid* view shows every
   session side by side with changed cells highlighted.
-- **Automatic carry-over**: opening the session after one with a setup fills in that setup, so you
-  only change what's different. It doesn't count as used until you edit something in it.
+- **Only enter what changes**: each session stores just the values you change. Blank boxes carry the
+  value from the closest earlier session, shown in grey. *Save setup* saves the full setup in force at
+  that session, pulling every carried value through.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
-  "Copy setup from …" copies the previous session; "New event from this setup" starts the next event.
+  "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.
 - **Backup**: data lives on the phone; export and import a JSON backup from the Events screen.
 

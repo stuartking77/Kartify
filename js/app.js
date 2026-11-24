@@ -22,29 +22,7 @@ function fmtDate(iso) {
 const findMeeting = (id) => state.meetings.find((m) => m.id === id);
 const label = (m, s) => store.sessionLabel(m, s);
 const tabName = (m, s) => s.name.trim() || store.defaultSessionName(m, s);
-// Any edit to a session makes its carried-over setup its own (see carryOver).
-function touch(m, s) {
-  if (s && s.inherited) { delete s.inherited; markChip(m, s); }
-  m.updatedAt = Date.now();
-  store.save(state);
-}
-
-// Opening the session straight after one with a setup fills in that setup, so only
-// changes need entering. It stays "carried over" (not counted as used, refreshed from
-// the previous session each time it's opened) until something in it is edited.
-function carryOver(m, s) {
-  if (s.cleared) return; // cleared on purpose: stay empty
-  const before = m.sessions[m.sessions.indexOf(s) - 1];
-  if (!before || before.inherited || !store.hasSetup(before)) {
-    // previous session no longer has a setup: drop the stale carried-over copy
-    if (s.inherited) { s.values = {}; delete s.inherited; store.save(state); }
-    return;
-  }
-  if (!s.inherited && store.sessionHasData(s)) return;
-  store.applySetup(s, before.values);
-  s.inherited = true;
-  store.save(state);
-}
+function touch(m) { m.updatedAt = Date.now(); store.save(state); }
 
 // ---------- Router ----------
 function route() {
@@ -197,35 +175,35 @@ function renderMeeting(m) {
   renderSessionForm(m, sess);
 }
 
-function previousFilled(m, sess) {
-  for (let i = m.sessions.indexOf(sess) - 1; i >= 0; i--) {
-    if (store.sessionHasData(m.sessions[i])) return m.sessions[i];
-  }
-  return null;
-}
-
-function inputHTML(field, side, value) {
+// Inputs show this session's own value; when blank, the value carried from earlier
+// sessions shows greyed out as the placeholder.
+function inputHTML(field, side, value, inherited = '') {
   const mode = field.kind === 'text' ? 'text' : 'decimal';
   return `
     <div class="cell">
-      <input data-field="${field.id}" data-side="${side}" value="${esc(value)}"
+      <input data-field="${field.id}" data-side="${side}" value="${esc(value)}" placeholder="${esc(inherited)}"
         inputmode="${mode}" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
         aria-label="${esc(field.label)} ${side === 'f' ? 'front' : side === 'r' ? 'rear' : ''}">
     </div>`;
 }
 
-// Buttons where tapping the selected one again clears it.
-function segHTML(fieldId, key, options, current) {
-  return `<div class="seg" data-choice="${fieldId}:${key}">${options.map((o) => {
+const segClass = (v, current, inherited) => (v === current ? 'act' : !current && v === inherited ? 'inh' : '');
+
+// Buttons where tapping the selected one again clears it (back to the carried value).
+function segHTML(fieldId, key, options, current, inherited = '') {
+  return `<div class="seg" data-choice="${fieldId}:${key}" data-inh="${esc(inherited)}">${options.map((o) => {
     const v = typeof o === 'string' ? o : o.v;
     const txt = typeof o === 'string' ? o : `${o.v}<small>= ${o.note}</small>`;
-    return `<button data-v="${v}" class="${v === current ? 'act' : ''}">${txt}</button>`;
+    return `<button data-v="${v}" class="${segClass(v, current, inherited)}">${txt}</button>`;
   }).join('')}</div>`;
 }
 
-function selectHTML(fieldId, key, options, current, aria) {
-  return `<select data-select="${fieldId}:${key}" aria-label="${esc(aria)}">
-    <option value="" ${current === '' ? 'selected' : ''}>–</option>
+const optText = (o) => (typeof o === 'number' || /^-?\d+$/.test(o) && Number(o) < 0 ? signed(o) : String(o));
+
+function selectHTML(fieldId, key, options, current, aria, inherited = '') {
+  const blank = inherited !== '' ? optText(options.find((o) => String(o) === inherited) ?? inherited) : '–';
+  return `<select data-select="${fieldId}:${key}" aria-label="${esc(aria)}" class="${current === '' && inherited !== '' ? 'inh' : ''}">
+    <option value="" ${current === '' ? 'selected' : ''}>${esc(blank)}</option>
     ${options.map((o) => `<option value="${o}" ${String(o) === String(current) ? 'selected' : ''}>${typeof o === 'number' ? signed(o) : o}</option>`).join('')}
   </select>`;
 }
@@ -262,11 +240,12 @@ const BRAKE_HTML = `<div class="brake"><b>1</b> = top position</div>`;
 
 function openRefSheet(ref, m, s, onPick) {
   let body = '';
+  const eff = { values: store.effectiveAt(m, s) };
   if (ref === 'stub') {
-    body = `<h3>Stub position (LHS)</h3>${stubHTML(s.values.stubPos?.f || '', true)}
+    body = `<h3>Stub position (LHS)</h3>${stubHTML(eff.values.stubPos?.f || '', true)}
       <div class="mute" style="text-align:center">Tap a position to select it.</div>`;
   } else if (ref === 'caster') {
-    const { top, bottom } = store.getCaster(s);
+    const { top, bottom } = store.getCaster(eff);
     body = `<h3>Caster</h3>
       <div class="mute">16.5° base, +3° when bottom is BACK, plus top position. Tap a value to select it.</div>
       ${casterTableHTML(top, bottom, true)}`;
@@ -281,18 +260,20 @@ function openRefSheet(ref, m, s, onPick) {
   });
 }
 
-function rowHTML(f, s) {
+// `inh` holds the setup carried from the sessions before this one.
+function rowHTML(f, s, inh) {
   const v = s.values[f.id] || {};
+  const iv = inh[f.id] || {};
+  const o = (k) => (v[k] == null ? '' : String(v[k]));
+  const i = (k) => iv[k] ?? '';
   if (f.kind === 'caster') {
-    const { top, bottom } = store.getCaster(s);
-    const deg = casterDegrees(top, bottom);
     return `
       <div class="frow wide">
         ${labelHTML(f)}
         <div class="wide-ctl">
-          <div class="lbl-ctl"><span>Top</span>${selectHTML('caster', 'top', CASTER_TOP, top, 'Caster top position')}</div>
-          <div class="lbl-ctl"><span>Bottom</span>${segHTML('caster', 'bottom', CASTER_BOTTOM, bottom)}</div>
-          <div class="caster-out" id="casterOut">${deg == null ? '–' : deg.toFixed(1) + '°'}</div>
+          <div class="lbl-ctl"><span>Top</span>${selectHTML('caster', 'top', CASTER_TOP, o('top'), 'Caster top position', i('top'))}</div>
+          <div class="lbl-ctl"><span>Bottom</span>${segHTML('caster', 'bottom', CASTER_BOTTOM, o('bottom'), i('bottom'))}</div>
+          <div class="caster-out" id="casterOut"></div>
         </div>
       </div>`;
   }
@@ -301,20 +282,20 @@ function rowHTML(f, s) {
       <div class="frow wide">
         ${labelHTML(f)}
         <div class="wide-ctl">
-          ${inputHTML(f, 'f', v.f ?? '')}
-          ${segHTML(f.id, 'd', f.options, v.d || '')}
+          ${inputHTML(f, 'f', o('f'), i('f'))}
+          ${segHTML(f.id, 'd', f.options, o('d'), i('d'))}
         </div>
       </div>`;
   }
   if (f.kind === 'choice') {
     const side = f.sides[0];
-    return `<div class="frow wide">${labelHTML(f)}<div class="wide-ctl">${segHTML(f.id, side, f.options, v[side] || '')}</div></div>`;
+    return `<div class="frow wide">${labelHTML(f)}<div class="wide-ctl">${segHTML(f.id, side, f.options, o(side), i(side))}</div></div>`;
   }
   if (f.kind === 'select') {
     return `
       <div class="frow">${labelHTML(f)}
         ${['f', 'r'].map((side) => f.sides.includes(side)
-          ? `<div class="cell">${selectHTML(f.id, side, f.options, v[side] ?? '', f.label)}</div>`
+          ? `<div class="cell">${selectHTML(f.id, side, f.options, o(side), f.label, i(side))}</div>`
           : '<div class="cell na"></div>').join('')}
       </div>`;
   }
@@ -322,14 +303,14 @@ function rowHTML(f, s) {
     <div class="frow">
       ${labelHTML(f)}
       ${['f', 'r'].map((side) => f.sides.includes(side)
-        ? inputHTML(f, side, store.getVal(s, f, side))
+        ? inputHTML(f, side, o(side), i(side))
         : '<div class="cell na"></div>').join('')}
     </div>`;
 }
 
 function renderSessionForm(m, s) {
-  carryOver(m, s);
-  const prev = previousFilled(m, s);
+  const idx = m.sessions.indexOf(s);
+  const inh = store.effectiveBefore(m, s);
 
   $app.innerHTML = `
     <div class="card times">
@@ -341,26 +322,26 @@ function renderSessionForm(m, s) {
           <input data-time="${t.id}" value="${esc(store.getVal(s, t))}" inputmode="decimal" autocomplete="off" placeholder="–"></label>`).join('')}
     </div>
     <div class="row">
-      ${prev && !s.inherited ? `<button id="copyPrev" style="flex:1 1 100%">Copy setup from ${esc(label(m, prev))}</button>` : ''}
       <button id="saveSetup" style="flex:1">Save setup</button>
       <button id="loadSetup" style="flex:1">Load setup</button>
     </div>
     <div id="changes"></div>
     <div class="card form">
       <div class="form-head"><span></span><span>Front</span><span>Rear</span></div>
-      ${FIELDS.map((f) => rowHTML(f, s)).join('')}
+      ${FIELDS.map((f) => rowHTML(f, s, inh)).join('')}
+      ${idx > 0 ? '<div class="mute form-foot">Grey values are carried from earlier sessions. Only enter what changes.</div>' : ''}
     </div>
     <div class="card">
       <h3>Notes</h3>
       <textarea id="notes" rows="5" placeholder="How did it feel? What changed?">${esc(s.notes)}</textarea>
     </div>`;
 
-  const changed = () => { touch(m, s); markChip(m, s); renderChanges(m, s, prev); };
+  const changed = () => { touch(m); markChip(m, s); renderChanges(m, s); };
 
   // Session name: blank by default; the next session's tab follows it ("Test 1" -> "Test 2").
   document.getElementById('sessName').addEventListener('input', (e) => {
     s.name = e.target.value;
-    touch(m, s);
+    touch(m);
     const i = m.sessions.indexOf(s);
     for (const x of m.sessions.slice(i, i + 2)) {
       const b = $nav.querySelector(`[data-s="${x.id}"]`);
@@ -379,16 +360,19 @@ function renderSessionForm(m, s) {
   $app.querySelectorAll('input[data-time]').forEach((el) => {
     el.addEventListener('input', () => {
       store.setVal(s, TIMES.find((t) => t.id === el.dataset.time), 'v', el.value.trim());
-      touch(m, s); markChip(m, s);
+      touch(m); markChip(m, s);
     });
     el.addEventListener('focus', () => el.select());
   });
+  // Caster degrees from the setup in force (this session's values, else carried ones).
   const updateCaster = () => {
     const out = document.getElementById('casterOut');
-    const { top, bottom } = store.getCaster(s);
+    const { top, bottom } = store.getCaster({ values: store.effectiveAt(m, s) });
     const deg = casterDegrees(top, bottom);
-    if (out) out.textContent = deg == null ? '–' : deg.toFixed(1) + '°';
+    out.textContent = deg == null ? '–' : deg.toFixed(1) + '°';
+    out.classList.toggle('inh', !store.hasOwn(s, FIELDS.find((f) => f.id === 'caster')));
   };
+  updateCaster();
   const setPart = (fid, key, value) => {
     s.values[fid] = { ...(s.values[fid] || {}), [key]: value };
     if (fid === 'caster') updateCaster();
@@ -399,26 +383,27 @@ function renderSessionForm(m, s) {
     seg.querySelectorAll('button').forEach((b) => b.onclick = () => {
       const cur = (s.values[fid] || {})[key] || '';
       const next = cur === b.dataset.v ? '' : b.dataset.v; // tap again to clear
-      seg.querySelectorAll('button').forEach((x) => x.classList.toggle('act', x.dataset.v === next));
+      paintSeg(seg, next);
       setPart(fid, key, next);
     });
   });
   $app.querySelectorAll('[data-select]').forEach((sel) => {
     const [fid, key] = sel.dataset.select.split(':');
-    sel.onchange = () => setPart(fid, key, sel.value);
+    sel.onchange = () => { sel.classList.toggle('inh', sel.value === '' && sel.options[0].text !== '–'); setPart(fid, key, sel.value); };
   });
 
   // Tap a row name with an ⓘ to see its reference; picks made there fill the row.
   $app.querySelectorAll('[data-ref]').forEach((b) => b.onclick = () => openRefSheet(b.dataset.ref, m, s, (pick) => {
     if (pick.stubPos) {
-      $app.querySelector('[data-select="stubPos:f"]').value = pick.stubPos;
+      const sel = $app.querySelector('[data-select="stubPos:f"]');
+      sel.value = pick.stubPos; sel.classList.remove('inh');
       setPart('stubPos', 'f', pick.stubPos);
     }
     if (pick.casterTop != null) {
       s.values.caster = { top: pick.casterTop, bottom: pick.casterBottom };
-      $app.querySelector('[data-select="caster:top"]').value = pick.casterTop;
-      $app.querySelectorAll('[data-choice="caster:bottom"] button').forEach((x) =>
-        x.classList.toggle('act', x.dataset.v === pick.casterBottom));
+      const sel = $app.querySelector('[data-select="caster:top"]');
+      sel.value = pick.casterTop; sel.classList.remove('inh');
+      paintSeg($app.querySelector('[data-choice="caster:bottom"]'), pick.casterBottom);
       setPart('caster', 'bottom', pick.casterBottom);
     }
   }));
@@ -426,20 +411,16 @@ function renderSessionForm(m, s) {
   document.getElementById('saveSetup').onclick = () => saveSetupSheet(m, s);
   document.getElementById('loadSetup').onclick = () => loadSetupSheet(m, s);
 
-  renderChanges(m, s, prev);
+  renderChanges(m, s);
   document.getElementById('notes').addEventListener('input', (e) => {
-    s.notes = e.target.value; touch(m, s); markChip(m, s);
+    s.notes = e.target.value; touch(m); markChip(m, s);
   });
 
-  if (prev && !s.inherited) {
-    document.getElementById('copyPrev').onclick = () => {
-      if (store.sessionHasData(s) && !confirm(`Replace this setup with ${label(m, prev)}? Times and notes are kept.`)) return;
-      store.applySetup(s, prev.values);
-      touch(m, s);
-      renderMeeting(m);
-      toast(`Copied setup from ${label(m, prev)}`);
-    };
-  }
+}
+
+function paintSeg(seg, current) {
+  const inh = seg.dataset.inh;
+  seg.querySelectorAll('button').forEach((x) => { x.className = segClass(x.dataset.v, current, inh); });
 }
 
 function markChip(m, s) {
@@ -456,38 +437,31 @@ function changeListHTML(diffs) {
       <td class="from">${esc(d.from) || '–'}</td><td class="arrow">→</td><td class="to">${esc(d.to) || '–'}</td></tr>`).join('')}</table>`;
 }
 
-function renderChanges(m, s, prev) {
+function renderChanges(m, s) {
   const el = document.getElementById('changes');
+  const i = m.sessions.indexOf(s);
   if (!el) return;
-  if (s.inherited) {
-    const before = m.sessions[m.sessions.indexOf(s) - 1];
-    el.innerHTML = `<div class="card changes-card"><h3>Setup carried over from ${esc(label(m, before))}</h3>
-      <div class="mute">Change only what's different.</div></div>`;
-    return;
-  }
-  if (!prev || !store.sessionHasData(s)) { el.innerHTML = ''; return; }
-  const diffs = store.diffSessions(prev, s);
+  if (i === 0 || !store.sessionHasData(s)) { el.innerHTML = ''; return; }
+  const diffs = store.diffSessions({ values: store.effectiveBefore(m, s) }, { values: store.effectiveAt(m, s) });
+  if (!diffs.length) { el.innerHTML = ''; return; }
   el.innerHTML = `
     <div class="card changes-card">
-      <h3>Changes from ${esc(label(m, prev))}</h3>
-      ${diffs.length ? changeListHTML(diffs) : '<div class="mute">No setup changes.</div>'}
+      <h3>Changes from ${esc(label(m, m.sessions[i - 1]))}</h3>
+      ${changeListHTML(diffs)}
     </div>`;
 }
 
-
 function renderGrid(m) {
   const cols = m.sessions;
-  // Highlight values that differ from the previous session that had a value.
+  // Each column shows the setup in force at that session; green = changed in that session,
+  // grey = carried from an earlier one.
+  const eff = cols.map((_, i) => ({ values: store.effectiveValues(m, i) }));
   const cell = (s, f, side) => {
-    const v = s.inherited ? '' : store.display(s, f, side);
-    let changed = false;
-    if (v) {
-      for (let j = cols.indexOf(s) - 1; j >= 0; j--) {
-        const pv = cols[j].inherited ? '' : store.display(cols[j], f, side);
-        if (pv) { changed = pv !== v; break; }
-      }
-    }
-    return `<td class="${changed ? 'chg' : ''} ${side === 'r' || f.sides.length === 1 ? 'edge' : ''}">${esc(v)}</td>`;
+    const i = cols.indexOf(s);
+    const v = store.display(eff[i], f, side);
+    const changed = i > 0 && v !== store.display(eff[i - 1], f, side);
+    const carried = !changed && v && !store.hasOwn(s, f);
+    return `<td class="${changed ? 'chg' : carried ? 'inh' : ''} ${side === 'r' || f.sides.length === 1 ? 'edge' : ''}">${esc(v)}</td>`;
   };
   const rowFor = (f) => `
     <tr><th class="stick">${esc(f.label)}${f.sides.length === 1 ? ` <span class="mute">${sideLabel(f.sides[0])}</span>` : ''}</th>
@@ -496,7 +470,7 @@ function renderGrid(m) {
         : cell(s, f, 'f') + cell(s, f, 'r')).join('')}</tr>`;
 
   $app.innerHTML = `
-    <div class="mute" style="margin:4px 0 8px">Green cells changed from the previous session. Tap a session to edit it.</div>
+    <div class="mute" style="margin:4px 0 8px">Green = changed in that session, grey = carried from before. Tap a session to edit it.</div>
     <div class="grid-wrap">
       <table class="grid">
         <thead>
@@ -567,11 +541,9 @@ function openMenu(m, sess) {
     d.close();
     if (a === 'details') openDetails(m);
     if (a === 'carry') carryForward(m);
-    if (a === 'clearSession' && confirm(`Clear "${label(m, sess)}"? Its setup, times and notes are emptied; the tab and its name stay.`)) {
+    if (a === 'clearSession' && confirm(`Clear "${label(m, sess)}"? Its changes, times and notes are removed, so it goes back to the setup carried from before. The tab and its name stay.`)) {
       sess.values = {};
       sess.notes = '';
-      delete sess.inherited;
-      sess.cleared = true; // don't refill from the previous session
       touch(m);
       renderMeeting(m);
       toast('Session cleared');
@@ -606,7 +578,7 @@ function saveSetupSheet(m, s) {
     <form method="dialog" class="sheet-body">
       <h3>Save setup</h3>
       <label class="field">Name<input name="name" value="${esc(suggested)}" placeholder="e.g. Whilton dry baseline" autocapitalize="words"></label>
-      <div class="mute">Saves this session's setup (not times or notes) so you can load it into any session later.</div>
+      <div class="mute">Saves the full setup in force at this session (including values carried from earlier sessions) so you can load it later.</div>
       <div class="row"><button class="pri" value="save" style="flex:1">Save</button></div>
     </form>`);
   const inp = d.querySelector('[name=name]');
@@ -616,7 +588,7 @@ function saveSetupSheet(m, s) {
     const existing = state.setups.find((x) => x.name.toLowerCase() === name.toLowerCase());
     if (existing && !confirm(`Replace the saved setup "${existing.name}"?`)) return;
     const entry = { id: existing?.id || store.uid(), name, track: m.track, kartClass: m.kartClass,
-      values: store.setupValues(s), savedAt: Date.now() };
+      values: store.effectiveAt(m, s), savedAt: Date.now() };
     state.setups = state.setups.filter((x) => x !== existing);
     state.setups.push(entry);
     store.save(state, true);
@@ -640,7 +612,7 @@ function loadSetupSheet(m, s) {
     d.close();
     if (store.sessionHasData(s) && !confirm(`Replace this session's setup with "${x.name}"? Times and notes are kept.`)) return;
     store.applySetup(s, x.values);
-    touch(m, s);
+    touch(m);
     store.save(state, true);
     renderMeeting(m);
     toast(`Loaded "${x.name}"`);
@@ -652,7 +624,7 @@ function carryForward(m) {
   const last = [...m.sessions].reverse().find((s) => store.sessionHasData(s));
   const n = store.newMeeting({ track: m.track, kartClass: m.kartClass });
   if (last) {
-    n.sessions[0].values = store.setupValues(last);
+    n.sessions[0].values = store.effectiveAt(m, last);
   }
   state.meetings.push(n);
   store.save(state, true);
