@@ -62,18 +62,28 @@ export function setVal(session, field, side, value) {
 
 export function getCaster(session) {
   const v = session.values.caster || {};
-  return { top: v.top || '', bottom: v.bottom ?? '' };
+  return { top: v.top ?? '', bottom: v.bottom || '' };
 }
 
 // Human-readable value for lists, grid and change record.
 export function display(session, field, side = 'v', long = false) {
   if (field.kind === 'caster') {
     const { top, bottom } = getCaster(session);
-    if (!top && bottom === '') return '';
+    if (top === '' && !bottom) return '';
     const deg = casterDegrees(top, bottom);
-    const pos = `${top || '?'} ${bottom === '' ? '?' : signed(bottom)}`;
+    const pos = `${top === '' ? '?' : signed(top)} ${bottom || '?'}`;
     if (deg == null) return pos;
     return long ? `${deg.toFixed(1)}° (${pos})` : `${deg.toFixed(1)}°`;
+  }
+  if (field.kind === 'dir') {
+    const v = session.values[field.id] || {};
+    if (!v.f && !v.d) return '';
+    return `${v.f || '?'} ${v.d || ''}`.trim();
+  }
+  if (field.kind === 'choice') {
+    const v = getVal(session, field, side);
+    const o = field.options.find((x) => x.v === v);
+    return o ? `${o.v} (${o.note})` : v;
   }
   return getVal(session, field, side);
 }
@@ -111,6 +121,25 @@ export function applySetup(session, values) {
   session.values = next;
 }
 
+const LEGACY_NAMES = LEGACY_SESSIONS.map(([, n]) => n).join('|');
+
+// Bring older saved sessions in line with the current field formats.
+function upgradeSession(s) {
+  const v = s.values;
+  // caster: top used to hold FWD/BACK and bottom the offset; now the other way round
+  if (v.caster && (v.caster.top === 'FWD' || v.caster.top === 'BACK')) {
+    v.caster = { top: v.caster.bottom ?? '', bottom: v.caster.top };
+  }
+  // camber/toe used to be signed numbers
+  for (const [id, pos, neg] of [['camber', 'POS', 'NEG'], ['toe', 'OUT', 'IN']]) {
+    const x = v[id];
+    if (x && x.f && !x.d && /^[-+−]/.test(x.f)) {
+      x.d = x.f.startsWith('+') ? pos : neg;
+      x.f = x.f.slice(1);
+    }
+  }
+}
+
 function normalise(data) {
   const setups = Array.isArray(data?.setups) ? data.setups : [];
   if (!data || !Array.isArray(data.meetings)) return { version: 2, meetings: [], setups };
@@ -118,9 +147,11 @@ function normalise(data) {
     if (!Array.isArray(m.sessions)) {
       // v1: fixed sessions keyed t1..f. Keep the ones that were used.
       const old = m.sessions || {};
-      m.sessions = LEGACY_SESSIONS.map(([k, name]) => ({ ...newSession(name), values: old[k]?.values || {}, notes: old[k]?.notes || '' }));
+      m.sessions = LEGACY_SESSIONS.map(([k]) => ({ ...newSession(), values: old[k]?.values || {}, notes: old[k]?.notes || '' }));
     }
-    for (const s of m.sessions) { s.id ||= uid(); s.values ||= {}; s.name ??= ''; s.notes ??= ''; }
+    for (const s of m.sessions) { s.id ||= uid(); s.values ||= {}; s.name ??= ''; s.notes ??= ''; upgradeSession(s); }
+    // An earlier version filled in Test 1 … Final when migrating; names should start blank.
+    if (m.sessions.map((s) => s.name).join('|') === LEGACY_NAMES) m.sessions.forEach((s) => { s.name = ''; });
     if (!m.sessions.length) m.sessions.push(newSession());
   }
   return { version: 2, meetings: data.meetings, setups };

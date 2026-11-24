@@ -7,11 +7,12 @@ full screen and works offline at the track.
 ## What it does (Setup tab)
 
 - **Events**: one per race meeting or test day (track, date, class).
-- **Sessions**: each event starts with 7 blank session tabs (add more with **+**). Name a session
-  (e.g. "Test 1") and the next tab defaults to "Test 2" until you type over it.
+- **Sessions**: each event starts with 7 blank, numbered session tabs (add more with **+**). Name a
+  session (e.g. "Test 1") and only the next tab defaults to "Test 2" until you type over it.
 - **Lap time and ref time** at the top of each session.
 - **Setup**: only the adjustable Front/Rear cells from the spreadsheet (greyed-out cells are left out).
-  Caster is entered as top (FWD/BACK) and bottom (−4…+4) positions and the degrees are calculated.
+  Camber is a number plus POS/NEG, toe a number plus IN/OUT, steering yoke LONG (= hard) / SHORT (= soft),
+  stub pos 1–5. Caster is entered as top (−4…+4) and bottom (FWD/BACK) positions and the degrees are calculated.
 - **Changes record**: each session shows what changed from the previous one. The *Changes* view
   lists the whole event in order, and the *Grid* view shows every session side by side with
   changed cells highlighted.

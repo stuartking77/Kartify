@@ -21,6 +21,7 @@ function fmtDate(iso) {
 
 const findMeeting = (id) => state.meetings.find((m) => m.id === id);
 const label = (m, s) => store.sessionLabel(m, s);
+const tabName = (m, s) => s.name.trim() || store.defaultSessionName(m, s);
 function touch(m) { m.updatedAt = Date.now(); store.save(state); }
 
 // ---------- Router ----------
@@ -163,7 +164,7 @@ function renderMeeting(m) {
   $nav.className = 'strip';
   $nav.innerHTML = `
     ${m.sessions.map((s) => `
-      <button data-s="${s.id}" class="${s.id === ui.session && ui.view === 'session' ? 'act' : ''} ${store.sessionHasData(s) ? 'has' : ''} ${s.name.trim() || store.defaultSessionName(m, s) ? '' : 'unnamed'}">${esc(label(m, s))}</button>`).join('')}
+      <button data-s="${s.id}" class="${s.id === ui.session && ui.view === 'session' ? 'act' : ''} ${store.sessionHasData(s) ? 'has' : ''} ${tabName(m, s) ? '' : 'unnamed'}">${esc(tabName(m, s) || m.sessions.indexOf(s) + 1)}</button>`).join('')}
     <button id="addSession" aria-label="Add session">+</button>
     <span class="sep"></span>
     <button data-view="log" class="${ui.view === 'log' ? 'act' : ''}">Changes</button>
@@ -197,27 +198,70 @@ function inputHTML(field, side, value) {
       <input data-field="${field.id}" data-side="${side}" value="${esc(value)}"
         inputmode="${mode}" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
         aria-label="${esc(field.label)} ${side === 'f' ? 'front' : side === 'r' ? 'rear' : ''}">
-      ${field.kind === 'signed' ? `<button class="sign" tabindex="-1" data-sign="${field.id}:${side}" aria-label="Toggle sign">±</button>` : ''}
     </div>`;
 }
 
-function casterRowHTML(s) {
-  const { top, bottom } = store.getCaster(s);
-  const deg = casterDegrees(top, bottom);
-  return `
-    <div class="frow caster">
-      <div class="flabel">Caster</div>
-      <div class="caster-ctl">
-        <div class="seg" id="casterTop">
-          ${CASTER_TOP.map((t) => `<button data-v="${t}" class="${t === top ? 'act' : ''}">${t}</button>`).join('')}
+// Buttons where tapping the selected one again clears it.
+function segHTML(fieldId, key, options, current) {
+  return `<div class="seg" data-choice="${fieldId}:${key}">${options.map((o) => {
+    const v = typeof o === 'string' ? o : o.v;
+    const txt = typeof o === 'string' ? o : `${o.v}<small>= ${o.note}</small>`;
+    return `<button data-v="${v}" class="${v === current ? 'act' : ''}">${txt}</button>`;
+  }).join('')}</div>`;
+}
+
+function selectHTML(fieldId, key, options, current, aria) {
+  return `<select data-select="${fieldId}:${key}" aria-label="${esc(aria)}">
+    <option value="" ${current === '' ? 'selected' : ''}>–</option>
+    ${options.map((o) => `<option value="${o}" ${String(o) === String(current) ? 'selected' : ''}>${typeof o === 'number' ? signed(o) : o}</option>`).join('')}
+  </select>`;
+}
+
+function labelHTML(f) {
+  return `<div class="flabel">${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}
+    ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>`;
+}
+
+function rowHTML(f, s) {
+  const v = s.values[f.id] || {};
+  if (f.kind === 'caster') {
+    const { top, bottom } = store.getCaster(s);
+    const deg = casterDegrees(top, bottom);
+    return `
+      <div class="frow wide">
+        ${labelHTML(f)}
+        <div class="wide-ctl">
+          <div class="lbl-ctl"><span>Top</span>${selectHTML('caster', 'top', CASTER_TOP, top, 'Caster top position')}</div>
+          <div class="lbl-ctl"><span>Bottom</span>${segHTML('caster', 'bottom', CASTER_BOTTOM, bottom)}</div>
+          <div class="caster-out" id="casterOut">${deg == null ? '–' : deg.toFixed(1) + '°'}</div>
         </div>
-        <select id="casterBottom" aria-label="Caster bottom position">
-          <option value="" ${bottom === '' ? 'selected' : ''}>–</option>
-          ${CASTER_BOTTOM.map((o) => `<option value="${o}" ${String(o) === String(bottom) ? 'selected' : ''}>${signed(o)}</option>`).join('')}
-        </select>
-        <div class="caster-out" id="casterOut">${deg == null ? '–' : deg.toFixed(1) + '°'}</div>
-      </div>
-      <div class="caster-lbl mute"><span>Top</span><span>Bottom</span><span></span></div>
+      </div>`;
+  }
+  if (f.kind === 'dir') {
+    return `
+      <div class="frow wide">
+        ${labelHTML(f)}
+        <div class="wide-ctl">
+          ${inputHTML(f, 'f', v.f ?? '')}
+          ${segHTML(f.id, 'd', f.options, v.d || '')}
+        </div>
+      </div>`;
+  }
+  if (f.kind === 'choice') {
+    return `<div class="frow wide">${labelHTML(f)}<div class="wide-ctl">${segHTML(f.id, 'f', f.options, v.f || '')}</div></div>`;
+  }
+  if (f.kind === 'select') {
+    return `
+      <div class="frow">${labelHTML(f)}
+        <div class="cell">${selectHTML(f.id, 'f', f.options, v.f ?? '', f.label)}</div><div class="cell na"></div>
+      </div>`;
+  }
+  return `
+    <div class="frow">
+      ${labelHTML(f)}
+      ${['f', 'r'].map((side) => f.sides.includes(side)
+        ? inputHTML(f, side, store.getVal(s, f, side))
+        : '<div class="cell na"></div>').join('')}
     </div>`;
 }
 
@@ -241,14 +285,7 @@ function renderSessionForm(m, s) {
     <div id="changes"></div>
     <div class="card form">
       <div class="form-head"><span></span><span>Front</span><span>Rear</span></div>
-      ${FIELDS.map((f) => f.kind === 'caster' ? casterRowHTML(s) : `
-        <div class="frow">
-          <div class="flabel">${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}
-            ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>
-          ${['f', 'r'].map((side) => f.sides.includes(side)
-            ? inputHTML(f, side, store.getVal(s, f, side))
-            : '<div class="cell na"></div>').join('')}
-        </div>`).join('')}
+      ${FIELDS.map((f) => rowHTML(f, s)).join('')}
     </div>
     <div class="card">
       <h3>Notes</h3>
@@ -264,7 +301,7 @@ function renderSessionForm(m, s) {
     const i = m.sessions.indexOf(s);
     for (const x of m.sessions.slice(i, i + 2)) {
       const b = $nav.querySelector(`[data-s="${x.id}"]`);
-      if (b) { b.textContent = label(m, x); b.classList.toggle('unnamed', !x.name.trim() && !store.defaultSessionName(m, x)); }
+      if (b) { b.textContent = tabName(m, x) || m.sessions.indexOf(x) + 1; b.classList.toggle('unnamed', !tabName(m, x)); }
     }
   });
 
@@ -283,38 +320,30 @@ function renderSessionForm(m, s) {
     });
     el.addEventListener('focus', () => el.select());
   });
-  $app.querySelectorAll('[data-sign]').forEach((btn) => {
-    btn.addEventListener('pointerdown', (e) => e.preventDefault()); // keep keyboard focus
-    btn.addEventListener('click', () => {
-      const [fid, side] = btn.dataset.sign.split(':');
-      const input = $app.querySelector(`input[data-field="${fid}"][data-side="${side}"]`);
-      let v = input.value.trim();
-      if (v.startsWith('-') || v.startsWith('−')) v = v.slice(1);
-      else if (v.startsWith('+')) v = '-' + v.slice(1);
-      else v = '-' + v;
-      input.value = v;
-      input.dispatchEvent(new Event('input'));
-    });
-  });
-
-  // Caster: pick top and bottom positions, degrees are calculated.
   const updateCaster = () => {
+    const out = document.getElementById('casterOut');
     const { top, bottom } = store.getCaster(s);
     const deg = casterDegrees(top, bottom);
-    document.getElementById('casterOut').textContent = deg == null ? '–' : deg.toFixed(1) + '°';
+    if (out) out.textContent = deg == null ? '–' : deg.toFixed(1) + '°';
+  };
+  const setPart = (fid, key, value) => {
+    s.values[fid] = { ...(s.values[fid] || {}), [key]: value };
+    if (fid === 'caster') updateCaster();
     changed();
   };
-  document.querySelectorAll('#casterTop button').forEach((b) => b.onclick = () => {
-    const cur = store.getCaster(s);
-    const top = cur.top === b.dataset.v ? '' : b.dataset.v; // tap again to clear
-    s.values.caster = { ...cur, top };
-    document.querySelectorAll('#casterTop button').forEach((x) => x.classList.toggle('act', x.dataset.v === top));
-    updateCaster();
+  $app.querySelectorAll('[data-choice]').forEach((seg) => {
+    const [fid, key] = seg.dataset.choice.split(':');
+    seg.querySelectorAll('button').forEach((b) => b.onclick = () => {
+      const cur = (s.values[fid] || {})[key] || '';
+      const next = cur === b.dataset.v ? '' : b.dataset.v; // tap again to clear
+      seg.querySelectorAll('button').forEach((x) => x.classList.toggle('act', x.dataset.v === next));
+      setPart(fid, key, next);
+    });
   });
-  document.getElementById('casterBottom').onchange = (e) => {
-    s.values.caster = { ...store.getCaster(s), bottom: e.target.value };
-    updateCaster();
-  };
+  $app.querySelectorAll('[data-select]').forEach((sel) => {
+    const [fid, key] = sel.dataset.select.split(':');
+    sel.onchange = () => setPart(fid, key, sel.value);
+  });
 
   document.getElementById('saveSetup').onclick = () => saveSetupSheet(m, s);
   document.getElementById('loadSetup').onclick = () => loadSetupSheet(m, s);
@@ -566,12 +595,12 @@ function renderRef() {
   $app.innerHTML = `
     <div class="card">
       <h3>Caster</h3>
-      <label>Top<div class="seg" id="rTop">${CASTER_TOP.map((t) =>
-        `<button data-v="${t}" class="${t === 'BACK' ? 'act' : ''}">${t}</button>`).join('')}</div></label>
-      <label>Bottom<select id="rBottom">${CASTER_BOTTOM.map((o) =>
+      <label>Top<select id="rTop">${CASTER_TOP.map((o) =>
         `<option value="${o}" ${o === 0 ? 'selected' : ''}>${signed(o)}</option>`).join('')}</select></label>
+      <label>Bottom<div class="seg" id="rBottom">${CASTER_BOTTOM.map((t) =>
+        `<button data-v="${t}" class="${t === 'BACK' ? 'act' : ''}">${t}</button>`).join('')}</div></label>
       <div class="res" id="rOut"></div>
-      <div class="mute" style="text-align:center">16.5° base, +3° when top is BACK, plus bottom position.</div>
+      <div class="mute" style="text-align:center">16.5° base, +3° when bottom is BACK, plus top position.</div>
     </div>
     <div class="card">
       <h3>Stub position (LHS)</h3>
@@ -581,22 +610,20 @@ function renderRef() {
       </div>
     </div>
     <div class="card">
-      <h3>Sign conventions</h3>
+      <h3>Brake position</h3>
       <table>
-        <tr><td>Camber</td><td><b>+</b> positive</td><td><b>−</b> negative</td></tr>
-        <tr><td>Toe</td><td><b>+</b> out</td><td><b>−</b> in</td></tr>
         <tr><td>Brake pos</td><td colspan="2"><b>1</b> = top</td></tr>
       </table>
     </div>`;
-  let top = 'BACK';
-  const bottom = document.getElementById('rBottom');
-  const update = () => { document.getElementById('rOut').textContent = casterDegrees(top, bottom.value).toFixed(1) + '°'; };
-  document.querySelectorAll('#rTop button').forEach((b) => b.onclick = () => {
-    top = b.dataset.v;
-    document.querySelectorAll('#rTop button').forEach((x) => x.classList.toggle('act', x === b));
+  let bottom = 'BACK';
+  const top = document.getElementById('rTop');
+  const update = () => { document.getElementById('rOut').textContent = casterDegrees(top.value, bottom).toFixed(1) + '°'; };
+  document.querySelectorAll('#rBottom button').forEach((b) => b.onclick = () => {
+    bottom = b.dataset.v;
+    document.querySelectorAll('#rBottom button').forEach((x) => x.classList.toggle('act', x === b));
     update();
   });
-  bottom.onchange = update;
+  top.onchange = update;
   update();
 }
 

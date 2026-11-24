@@ -146,3 +146,15 @@ nav.strip button.unnamed{color:var(--mute);font-style:italic}
 .saved{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #22262d}
 .saved:last-child{border-bottom:0}
 .saved-pick{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+
+/* Rows with buttons / drop-downs spanning the Front + Rear columns */
+.frow.wide{grid-template-columns:minmax(0,1fr) auto}
+.wide-ctl{display:flex;gap:6px;align-items:flex-end;justify-content:flex-end}
+.wide-ctl .cell{width:72px}
+.wide-ctl .seg button{padding:8px 10px;font-size:13px;min-width:52px;line-height:1.15}
+.wide-ctl .seg button small{display:block;font-size:10px;opacity:.8;font-weight:500}
+.lbl-ctl{display:flex;flex-direction:column;align-items:center;gap:2px}
+.lbl-ctl span{font-size:10px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.lbl-ctl select{height:36px;padding:0 6px;min-width:56px;font-weight:600}
+.frow .cell select{width:100%;height:38px;font-weight:600}
+.caster-out{align-self:center}

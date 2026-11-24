@@ -16,26 +16,29 @@ export const TIMES = [
 // Setup rows. `sides` lists which of Front (f) / Rear (r) can be adjusted;
 // the cells greyed out in the spreadsheet are left out.
 // kind: 'num'    -> numeric keypad
-//       'signed' -> numeric keypad + a ± button (iOS decimal pad has no minus key)
 //       'text'   -> full keyboard
+//       'dir'    -> number plus a direction button (camber POS/NEG, toe IN/OUT)
+//       'choice' -> pick one of `options` (steering yoke)
+//       'select' -> drop-down of `options` (stub pos)
 //       'caster' -> top / bottom positions, caster degrees calculated
 export const FIELDS = [
   { id: 'hotPressure',  label: 'Hot pressure', kind: 'num', unit: 'psi', sides: ['f', 'r'] },
-  { id: 'camber',       label: 'Camber', kind: 'signed', hint: '+ pos / − neg', sides: ['f'] },
+  { id: 'camber',       label: 'Camber', kind: 'dir', options: ['POS', 'NEG'], sides: ['f'] },
   { id: 'caster',       label: 'Caster', kind: 'caster', sides: ['f'] },
-  { id: 'toe',          label: 'Toe', kind: 'signed', hint: '+ out / − in', sides: ['f'] },
-  { id: 'steeringYoke', label: 'Steering yoke', kind: 'text', sides: ['f'] },
-  { id: 'stubPos',      label: 'Stub pos', kind: 'num', hint: '1–5, see Ref', sides: ['f'] },
+  { id: 'toe',          label: 'Toe', kind: 'dir', options: ['IN', 'OUT'], sides: ['f'] },
+  { id: 'steeringYoke', label: 'Steering yoke', kind: 'choice', sides: ['f'],
+    options: [{ v: 'LONG', note: 'HARD' }, { v: 'SHORT', note: 'SOFT' }] },
+  { id: 'stubPos',      label: 'Stub pos', kind: 'select', options: ['1', '2', '3', '4', '5'], hint: 'see Ref', sides: ['f'] },
   { id: 'width',        label: 'Width', kind: 'num', sides: ['f', 'r'] },
   { id: 'wbase',        label: 'Wheelbase', kind: 'text', sides: ['r'] },
   { id: 'seatH',        label: 'Seat height', kind: 'text', sides: ['r'] },
   { id: 'weightDist',   label: 'Weight dist', kind: 'num', sides: ['r'] },
   { id: 'rideH',        label: 'Ride height', kind: 'text', sides: ['f', 'r'] },
-  { id: 'jet',          label: 'Jet', kind: 'num', sides: ['f', 'r'] },
-  { id: 'pinion',       label: 'Pinion', kind: 'num', sides: ['r'] },
-  { id: 'sprocket',     label: 'Sprocket', kind: 'num', sides: ['r'] },
   { id: 'third',        label: '3rd', kind: 'text', sides: ['f', 'r'] },
   { id: 'fBar',         label: 'Front bar', kind: 'text', sides: ['f', 'r'] },
+  { id: 'jet',          label: 'Jet', kind: 'num', sides: ['r'] },
+  { id: 'pinion',       label: 'Pinion', kind: 'num', sides: ['r'] },
+  { id: 'sprocket',     label: 'Sprocket', kind: 'num', sides: ['r'] },
   { id: 'brkPedal',     label: 'Brake pedal', kind: 'num', hint: '1 = top', sides: ['r'] },
   { id: 'brkCyl',       label: 'Brake cyl', kind: 'text', sides: ['r'] },
   { id: 'other1',       label: 'Other', kind: 'text', sides: ['f', 'r'] },
@@ -43,12 +46,13 @@ export const FIELDS = [
   { id: 'other3',       label: 'Other', kind: 'text', sides: ['f', 'r'] },
 ];
 
-// Caster from the sheet: =16.5 + IF(top="FWD",0,3) + bottom
+// Caster from the sheet: =16.5 + IF(bottom="FWD",0,3) + top
+// Top position is -4..+4, bottom position is FWD/BACK.
 export const CASTER_BASE = 16.5;
-export const CASTER_TOP = ['FWD', 'BACK'];
-export const CASTER_BOTTOM = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+export const CASTER_TOP = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+export const CASTER_BOTTOM = ['FWD', 'BACK'];
 export function casterDegrees(top, bottom) {
-  if (!top || bottom === '' || bottom == null) return null;
-  return CASTER_BASE + (top === 'FWD' ? 0 : 3) + Number(bottom);
+  if (top === '' || top == null || !bottom) return null;
+  return CASTER_BASE + (bottom === 'FWD' ? 0 : 3) + Number(top);
 }
 export const signed = (n) => (Number(n) > 0 ? '+' + n : String(n));
