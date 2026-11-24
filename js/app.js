@@ -5,7 +5,7 @@ const state = store.load();
 const $app = document.getElementById('app');
 const $hdr = document.getElementById('hdr');
 const $nav = document.getElementById('nav');
-const ui = { session: null, view: 'session' }; // session: id; view: session | log | grid
+const ui = { session: null, view: 'session' }; // session: id; view: session | grid
 
 const LOGO = `<svg class="logo" viewBox="0 0 86 86" aria-label="Shift Motorsport"><defs><mask id="sm_logo"><rect width="86" height="86" fill="#fff"/><path d="M25 0h5v30H0v-5h25zM56 0h5v61H0v-5h56z" fill="#000"/></mask></defs><rect width="86" height="86" rx="7" fill="var(--acc)" mask="url(#sm_logo)"/></svg>`;
 
@@ -177,7 +177,6 @@ function renderMeeting(m) {
       <button data-s="${s.id}" class="${s.id === ui.session && ui.view === 'session' ? 'act' : ''} ${store.sessionHasData(s) ? 'has' : ''} ${tabName(m, s) ? '' : 'unnamed'}">${esc(tabName(m, s) || m.sessions.indexOf(s) + 1)}</button>`).join('')}
     <button id="addSession" aria-label="Add session">+</button>
     <span class="sep"></span>
-    <button data-view="log" class="${ui.view === 'log' ? 'act' : ''}">Changes</button>
     <button data-view="grid" class="${ui.view === 'grid' ? 'act' : ''}">Grid</button>`;
   $nav.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => openSession(m, b.dataset.s));
   $nav.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => { ui.view = b.dataset.view; renderMeeting(m); });
@@ -190,7 +189,6 @@ function renderMeeting(m) {
   $nav.querySelector('.act')?.scrollIntoView({ inline: 'center', block: 'nearest' });
 
   if (ui.view === 'grid') return renderGrid(m);
-  if (ui.view === 'log') return renderLog(m);
   renderSessionForm(m, sess);
 }
 
@@ -471,33 +469,6 @@ function renderChanges(m, s, prev) {
     </div>`;
 }
 
-function timesLine(s) {
-  const t = store.getVal(s, TIMES[0]), rt = store.getVal(s, TIMES[1]);
-  if (!t && !rt) return '';
-  return `<span class="log-time">${esc(t)}${rt ? ` <span class="mute">ref ${esc(rt)}</span>` : ''}</span>`;
-}
-
-// Changes record: every session in order, what changed going into it, times and notes.
-function renderLog(m) {
-  const filled = m.sessions.filter((s) => store.sessionHasData(s));
-  if (!filled.length) {
-    $app.innerHTML = '<div class="card"><div class="mute">No sessions recorded yet.</div></div>';
-    return;
-  }
-  $app.innerHTML = filled.map((s, i) => {
-    const prev = i > 0 ? filled[i - 1] : null;
-    const diffs = prev ? store.diffSessions(prev, s) : null;
-    return `
-      <div class="card">
-        <div class="log-head"><button class="link" data-s="${s.id}">${esc(label(m, s))}</button>${timesLine(s)}</div>
-        ${prev
-          ? (diffs.length ? changeListHTML(diffs) : `<div class="mute">No changes from ${esc(label(m, prev))}.</div>`)
-          : '<div class="mute">Baseline setup.</div>'}
-        ${s.notes ? `<div class="log-notes">${esc(s.notes)}</div>` : ''}
-      </div>`;
-  }).join('');
-  $app.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => openSession(m, b.dataset.s));
-}
 
 function renderGrid(m) {
   const cols = m.sessions;

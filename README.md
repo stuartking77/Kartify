@@ -13,9 +13,8 @@ full screen and works offline at the track.
 - **Setup**: only the adjustable Front/Rear cells from the spreadsheet (greyed-out cells are left out).
   Camber is a number plus POS/NEG, toe a number plus IN/OUT, steering yoke LONG (= hard) / SHORT (= soft),
   stub pos 1–5, wheelbase S/M/L, 3rd IN/OUT (rear), front bar OUT/NYLON/STEEL, pinion 10–14. Caster is entered as top (−4…+4) and bottom (FWD/BACK) positions and the degrees are calculated.
-- **Changes record**: each session shows what changed from the previous one. The *Changes* view
-  lists the whole event in order, and the *Grid* view shows every session side by side with
-  changed cells highlighted.
+- **Changes**: each session shows what changed from the previous one, and the *Grid* view shows every
+  session side by side with changed cells highlighted.
 - **Automatic carry-over**: opening the session after one with a setup fills in that setup, so you
   only change what's different. It doesn't count as used until you edit something in it.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
