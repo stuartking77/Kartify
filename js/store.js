@@ -138,6 +138,15 @@ export function effectiveValues(m, index) {
   }
   return out;
 }
+// Session info value carried from the closest earlier session that has one.
+export function carriedInfo(m, s, item) {
+  for (let i = m.sessions.indexOf(s) - 1; i >= 0; i--) {
+    const v = getVal(m.sessions[i], item);
+    if (v) return v;
+  }
+  return '';
+}
+
 export const effectiveAt = (m, s) => effectiveValues(m, m.sessions.indexOf(s));
 export const effectiveBefore = (m, s) => effectiveValues(m, m.sessions.indexOf(s) - 1);
 export const hasOwn = (session, field) => partsOf(field).some((k) => own(session, field.id, k) !== '');

@@ -7,10 +7,13 @@ export const LEGACY_SESSIONS = [
   ['h1', 'Heat 1'], ['h2', 'Heat 2'], ['f', 'Final'],
 ];
 
-// Lap times: one value per session, shown at the top of each session.
+// Session info at the top of each session (not part of a saved setup).
+// carry: blank shows the value from the closest earlier session (greyed), like setup values.
 export const TIMES = [
-  { id: 'time',    label: 'Time',     kind: 'text' },
-  { id: 'refTime', label: 'Ref time', kind: 'text' },
+  { id: 'tyre',    label: 'Tyre',     kind: 'text', wide: true, carry: true, placeholder: 'e.g. Komet K2H set 1' },
+  { id: 'time',    label: 'Time',     kind: 'num' },
+  { id: 'refTime', label: 'Ref time', kind: 'num' },
+  { id: 'comment', label: 'Comment',  kind: 'text', wide: true, placeholder: 'Short comment' },
 ];
 
 // Setup rows. `sides` lists which of Front (f) / Rear (r) can be adjusted;

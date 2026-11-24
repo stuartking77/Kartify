@@ -180,3 +180,9 @@ select.inh{color:#7d848e;font-weight:500}
 .caster-out.inh{color:#7d848e}
 .grid td.inh{color:#6b727c}
 .form-foot{padding:8px 0 4px;border-top:1px solid #22262d}
+
+/* Tyre + comment */
+.times label.info-field{grid-column:1/-1}
+.times label.info-field input{font-size:16px;font-weight:500;text-align:left;padding:9px 10px;text-transform:none}
+.times input.carried::placeholder{color:#7d848e}
+.grid tr.info-row td{white-space:normal;max-width:180px;min-width:90px;font-size:12px;text-align:left}

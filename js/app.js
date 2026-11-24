@@ -318,8 +318,11 @@ function renderSessionForm(m, s) {
         <input id="sessName" value="${esc(s.name)}" placeholder="${esc(store.defaultSessionName(m, s) || 'Name, e.g. Test 1')}"
           autocomplete="off" autocapitalize="words" class="${store.defaultSessionName(m, s) ? 'has-default' : ''}"></label>
       ${TIMES.map((t) => `
-        <label class="time"><span>${t.label}</span>
-          <input data-time="${t.id}" value="${esc(store.getVal(s, t))}" inputmode="decimal" autocomplete="off" placeholder="–"></label>`).join('')}
+        <label class="time ${t.wide ? 'info-field' : ''}"><span>${t.label}</span>
+          <input data-time="${t.id}" value="${esc(store.getVal(s, t))}" inputmode="${t.kind === 'num' ? 'decimal' : 'text'}"
+            autocomplete="off" autocapitalize="sentences" maxlength="${t.id === 'comment' ? 60 : 40}"
+            placeholder="${esc((t.carry && store.carriedInfo(m, s, t)) || t.placeholder || '–')}"
+            class="${t.carry && store.carriedInfo(m, s, t) ? 'carried' : ''}"></label>`).join('')}
     </div>
     <div class="row">
       <button id="saveSetup" style="flex:1">Save setup</button>
@@ -479,8 +482,10 @@ function renderGrid(m) {
         </thead>
         <tbody>
           ${TIMES.map((t) => `
-            <tr class="time-row"><th class="stick">${t.label}</th>${cols.map((s) =>
-              `<td colspan="2" class="edge">${esc(store.getVal(s, t))}</td>`).join('')}</tr>`).join('')}
+            <tr class="time-row ${t.wide ? 'info-row' : ''}"><th class="stick">${t.label}</th>${cols.map((s) => {
+              const v = store.getVal(s, t), c = !v && t.carry ? store.carriedInfo(m, s, t) : '';
+              return `<td colspan="2" class="edge ${c ? 'inh' : ''}">${esc(v || c)}</td>`;
+            }).join('')}</tr>`).join('')}
           <tr class="sub"><th class="stick"></th>${cols.map(() => '<th>F</th><th class="edge">R</th>').join('')}</tr>
           ${FIELDS.map(rowFor).join('')}
           <tr><th class="stick">Notes</th>${cols.map((s) =>
