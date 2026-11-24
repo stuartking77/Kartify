@@ -7,23 +7,26 @@ full screen and works offline at the track.
 ## What it does (Setup tab)
 
 - **Events**: one per race meeting or test day (track, date, class).
-- **Sessions**: Test 1, Test 2, Test 3, Qualifying, Heat 1, Heat 2, Final.
-- **Setup**: Front/Rear values for hot pressure, camber, caster, toe, steering yoke, stub pos,
-  width, wheelbase, seat height, weight distribution, ride height, jet, pinion, sprocket, 3rd,
-  front bar, brake pedal, brake cylinder, 3 × other, plus lap time, ref time, notes and a wets flag.
+- **Sessions**: each event starts with 7 blank session tabs (add more with **+**). Name a session
+  (e.g. "Test 1") and the next tab defaults to "Test 2" until you type over it.
+- **Lap time and ref time** at the top of each session.
+- **Setup**: only the adjustable Front/Rear cells from the spreadsheet (greyed-out cells are left out).
+  Caster is entered as top (FWD/BACK) and bottom (−4…+4) positions and the degrees are calculated.
 - **Changes record**: each session shows what changed from the previous one. The *Changes* view
-  lists the whole event in order, and the *Grid* view shows every session side by side
-  (like the spreadsheet) with changed cells highlighted.
-- **Copy from previous session**, and **New event from this setup**, so you only enter what changed.
-- **Reference**: caster calculator (16.5° + 3° if BACK + offset), stub position diagram, sign conventions.
+  lists the whole event in order, and the *Grid* view shows every session side by side with
+  changed cells highlighted.
+- **Save / load setups**: save a session's setup by name and load it into any session later.
+  "Copy setup from …" copies the previous session; "New event from this setup" starts the next event.
+- **Reference**: caster calculator, stub position diagram, sign conventions.
 - **Backup**: data lives on the phone; export and import a JSON backup from the Events screen.
 
 ## Publishing to GitHub Pages
 
-1. Merge to `main`.
-2. In the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. The workflow in `.github/workflows/pages.yml` deploys on every push to `main`.
-   The site appears at `https://<user>.github.io/<repo>/`.
+Currently served from the `claude/tender-cannon-a36wih` branch (**Settings → Pages → Deploy from a branch**),
+at https://stuartking77.github.io/Kartify/.
+
+If you later move to a `main` branch, set **Source: GitHub Actions** and the workflow in
+`.github/workflows/pages.yml` deploys on every push to `main`.
 
 ## Installing on iPhone
 

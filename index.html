@@ -2,25 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Kartify</title>
   <meta name="description" content="Kart setup sheet: events, sessions and setup changes.">
-  <meta name="theme-color" content="#0f1115">
+  <meta name="theme-color" content="#0f1114">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Kartify">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <div id="app"></div>
-  <nav class="tabbar">
-    <a href="#/" data-tab="setup"><span class="ti">▦</span>Setup</a>
-    <a href="#/ref" data-tab="ref"><span class="ti">◎</span>Reference</a>
-  </nav>
+  <header id="hdr"></header>
+  <nav id="nav"></nav>
+  <main>
+    <div id="app"></div>
+    <div class="brand">
+      <svg class="bm" viewBox="0 0 86 86" aria-label="Shift Motorsport"><defs><mask id="sm_bm"><rect width="86" height="86" fill="#fff"/><path d="M25 0h5v30H0v-5h25zM56 0h5v61H0v-5h56z" fill="#000"/></mask></defs><rect width="86" height="86" rx="7" fill="var(--acc)" mask="url(#sm_bm)"/></svg>
+      <img alt="Shift Motorsport" src="icons/shift-wordmark.png">
+    </div>
+  </main>
+  <div id="toast"></div>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

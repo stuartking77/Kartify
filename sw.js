@@ -1,9 +1,9 @@
 // Offline support. Bump VERSION whenever app files change so phones pick up the update.
-const VERSION = 'kartify-v1';
+const VERSION = 'kartify-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/store.js', './js/schema.js',
-  './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png',
+  './icons/apple-touch-icon.png', './icons/icon-192.png', './icons/icon-512.png', './icons/shift-wordmark.png',
 ];
 
 self.addEventListener('install', (e) => {

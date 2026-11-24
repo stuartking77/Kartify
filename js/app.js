@@ -1,9 +1,13 @@
-import { SESSIONS, FIELDS, CASTER_OFFSETS, casterDegrees } from './schema.js';
+import { FIELDS, TIMES, CASTER_TOP, CASTER_BOTTOM, casterDegrees, signed } from './schema.js';
 import * as store from './store.js';
 
 const state = store.load();
 const $app = document.getElementById('app');
-const ui = { session: 't1', view: 'session' }; // view: session | grid | log
+const $hdr = document.getElementById('hdr');
+const $nav = document.getElementById('nav');
+const ui = { session: null, view: 'session' }; // session: id; view: session | log | grid
+
+const LOGO = `<svg class="logo" viewBox="0 0 86 86" aria-label="Shift Motorsport"><defs><mask id="sm_logo"><rect width="86" height="86" fill="#fff"/><path d="M25 0h5v30H0v-5h25zM56 0h5v61H0v-5h56z" fill="#000"/></mask></defs><rect width="86" height="86" rx="7" fill="var(--acc)" mask="url(#sm_logo)"/></svg>`;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,20 +19,18 @@ function fmtDate(iso) {
   return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function findMeeting(id) { return state.meetings.find((m) => m.id === id); }
-
+const findMeeting = (id) => state.meetings.find((m) => m.id === id);
+const label = (m, s) => store.sessionLabel(m, s);
 function touch(m) { m.updatedAt = Date.now(); store.save(state); }
 
 // ---------- Router ----------
 function route() {
-  const hash = location.hash.slice(1) || '/';
-  const parts = hash.split('/').filter(Boolean);
-  document.querySelectorAll('.tabbar a').forEach((a) =>
-    a.classList.toggle('active', a.dataset.tab === (parts[0] === 'ref' ? 'ref' : 'setup')));
+  const parts = (location.hash.slice(1) || '/').split('/').filter(Boolean);
   if (parts[0] === 'm' && parts[1]) {
     const m = findMeeting(parts[1]);
     if (!m) { location.hash = '#/'; return; }
-    if (parts[2] && SESSIONS.some((s) => s.id === parts[2])) ui.session = parts[2];
+    if (parts[2] && m.sessions.some((s) => s.id === parts[2])) ui.session = parts[2];
+    if (!m.sessions.some((s) => s.id === ui.session)) ui.session = m.sessions[0].id;
     renderMeeting(m);
   } else if (parts[0] === 'ref') {
     renderRef();
@@ -39,55 +41,78 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 
+function topNav(active) {
+  $nav.className = '';
+  $nav.innerHTML = `
+    <button data-go="#/" class="${active === 'setup' ? 'act' : ''}">Setup</button>
+    <button data-go="#/ref" class="${active === 'ref' ? 'act' : ''}">Reference</button>`;
+  $nav.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => { location.hash = b.dataset.go; });
+}
+
+function openSession(m, sid) {
+  ui.view = 'session';
+  ui.session = sid;
+  const h = `#/m/${m.id}/${sid}`;
+  if (location.hash === h) renderMeeting(m); else location.hash = h;
+}
+
 // ---------- Home ----------
 function renderHome() {
+  $hdr.innerHTML = `${LOGO}<h1>KARTIFY</h1><button id="new" class="pri sm">+ New event</button>`;
+  topNav('setup');
   const meetings = [...state.meetings].sort((a, b) =>
     (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
 
   $app.innerHTML = `
-    <header class="bar">
-      <h1>Events</h1>
-      <button class="btn primary" id="new">+ New</button>
-    </header>
-    <main class="content">
-      ${meetings.length === 0 ? `
-        <div class="empty">
-          <p>No events yet.</p>
-          <p class="muted">Create one for each race event or test day, then fill in the setup for each session.</p>
-        </div>` : `
-        <ul class="cards">
-          ${meetings.map((m) => {
-            const used = SESSIONS.filter((s) => store.sessionHasData(m.sessions[s.id]));
-            return `
-            <li><a class="card" href="#/m/${m.id}">
-              <div class="card-main">
-                <div class="card-title">${esc(m.track) || '<span class="muted">Untitled event</span>'}</div>
-                <div class="card-sub">${esc(fmtDate(m.date))}${m.kartClass ? ' · ' + esc(m.kartClass) : ''}</div>
-              </div>
-              <div class="pips">${SESSIONS.map((s) =>
-                `<span class="pip ${used.includes(s) ? 'on' : ''}" title="${s.label}">${s.short}</span>`).join('')}</div>
-            </a></li>`;
-          }).join('')}
-        </ul>`}
-      <section class="backup">
-        <h2>Backup</h2>
-        <p class="muted small">Data is stored on this device only. Export a backup now and then.</p>
-        <div class="row gap">
-          <button class="btn" id="export">Export</button>
-          <label class="btn">Import<input type="file" id="import" accept="application/json,.json" hidden></label>
-        </div>
-      </section>
-    </main>`;
+    ${meetings.length === 0 ? `
+      <div class="card empty">
+        <h3>No events yet</h3>
+        <p class="mute">Create one for each race meeting or test day, then fill in the setup for each session.</p>
+      </div>` : meetings.map((m) => {
+        const used = m.sessions.filter((s) => store.sessionHasData(s));
+        return `
+        <a class="card event" href="#/m/${m.id}">
+          <div class="ev-title">${esc(m.track) || '<span class="mute">Untitled event</span>'}</div>
+          <div class="mute">${esc(fmtDate(m.date))}${m.kartClass ? ' · ' + esc(m.kartClass) : ''}</div>
+          ${used.length ? `<div class="pips">${used.map((s) => `<span class="pill on">${esc(label(m, s))}</span>`).join('')}</div>` : ''}
+        </a>`;
+      }).join('')}
+    ${state.setups.length ? `
+    <div class="card">
+      <h3>Saved setups</h3>
+      ${savedSetupsSorted().map((x) => `
+        <div class="saved">
+          <div><div>${esc(x.name)}</div><div class="mute">${esc(setupMeta(x))}</div></div>
+          <button class="sm danger" data-del-setup="${x.id}">Delete</button>
+        </div>`).join('')}
+    </div>` : ''}
+    <div class="card">
+      <h3>Backup</h3>
+      <p class="mute">Data is stored on this phone only. Export a backup now and then.</p>
+      <div class="row">
+        <button id="export" style="flex:1">Export</button>
+        <button id="importBtn" style="flex:1">Import</button>
+        <input type="file" id="import" accept="application/json,.json" hidden>
+      </div>
+    </div>`;
 
   document.getElementById('new').onclick = () => {
     const m = store.newMeeting();
     state.meetings.push(m);
     store.save(state, true);
-    ui.session = 't1';
+    ui.session = m.sessions[0].id; ui.view = 'session';
     location.hash = `#/m/${m.id}`;
     setTimeout(() => openDetails(m, true), 50);
   };
+  $app.querySelectorAll('[data-del-setup]').forEach((b) => b.onclick = () => {
+    const x = state.setups.find((y) => y.id === b.dataset.delSetup);
+    if (!confirm(`Delete saved setup "${x.name}"?`)) return;
+    state.setups = state.setups.filter((y) => y !== x);
+    store.save(state, true);
+    renderHome();
+  });
   document.getElementById('export').onclick = exportBackup;
+  document.getElementById('importBtn').onclick = () => document.getElementById('import').click();
   document.getElementById('import').onchange = importBackup;
 }
 
@@ -121,48 +146,46 @@ async function importBackup(e) {
 
 // ---------- Event ----------
 function renderMeeting(m) {
-  const idx = SESSIONS.findIndex((s) => s.id === ui.session);
-  const sess = SESSIONS[idx];
+  const sess = m.sessions.find((s) => s.id === ui.session) || m.sessions[0];
+  ui.session = sess.id;
 
-  $app.innerHTML = `
-    <header class="bar">
-      <a class="btn ghost back" href="#/" aria-label="Back">‹</a>
-      <button class="title-btn" id="details">
-        <span class="t">${esc(m.track) || 'Untitled event'}</span>
-        <span class="s">${esc(fmtDate(m.date))}${m.kartClass ? ' · ' + esc(m.kartClass) : ''}</span>
-      </button>
-      <button class="btn ghost" id="menu" aria-label="More">•••</button>
-    </header>
-    <nav class="sessions" id="sessions">
-      ${SESSIONS.map((s) => `
-        <a href="#/m/${m.id}/${s.id}" class="chip ${s.id === ui.session && ui.view === 'session' ? 'active' : ''} ${store.sessionHasData(m.sessions[s.id]) ? 'has' : ''}">${s.label}</a>`).join('')}
-      <button class="chip view-chip ${ui.view === 'log' ? 'active' : ''}" data-view="log">Changes</button>
-      <button class="chip view-chip ${ui.view === 'grid' ? 'active' : ''}" data-view="grid">Grid</button>
-    </nav>
-    <main class="content" id="body"></main>`;
-
+  $hdr.innerHTML = `
+    <button class="sm back" id="back" aria-label="Back">‹</button>
+    <button class="hdr-title" id="details">
+      <span class="t">${esc(m.track) || 'Untitled event'}</span>
+      <span class="s">${esc(fmtDate(m.date))}${m.kartClass ? ' · ' + esc(m.kartClass) : ''}</span>
+    </button>
+    <button class="sm" id="menu" aria-label="More">•••</button>`;
+  document.getElementById('back').onclick = () => { location.hash = '#/'; };
   document.getElementById('details').onclick = () => openDetails(m);
-  document.getElementById('menu').onclick = () => openMenu(m);
-  document.querySelectorAll('#sessions [data-view]').forEach((b) =>
-    b.addEventListener('click', () => { ui.view = b.dataset.view; renderMeeting(m); }));
-  document.querySelectorAll('#sessions a').forEach((a) =>
-    a.addEventListener('click', () => {
-      const same = a.getAttribute('href') === location.hash;
-      ui.view = 'session';
-      if (same) renderMeeting(m); // hash unchanged, so no hashchange event
-    }));
-  // keep active chip visible
-  document.querySelector('#sessions .active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  document.getElementById('menu').onclick = () => openMenu(m, sess);
 
-  const body = document.getElementById('body');
-  if (ui.view === 'grid') { renderGrid(m, body); return; }
-  if (ui.view === 'log') { renderLog(m, body); return; }
-  renderSessionForm(m, sess, idx, body);
+  $nav.className = 'strip';
+  $nav.innerHTML = `
+    ${m.sessions.map((s) => `
+      <button data-s="${s.id}" class="${s.id === ui.session && ui.view === 'session' ? 'act' : ''} ${store.sessionHasData(s) ? 'has' : ''} ${s.name.trim() || store.defaultSessionName(m, s) ? '' : 'unnamed'}">${esc(label(m, s))}</button>`).join('')}
+    <button id="addSession" aria-label="Add session">+</button>
+    <span class="sep"></span>
+    <button data-view="log" class="${ui.view === 'log' ? 'act' : ''}">Changes</button>
+    <button data-view="grid" class="${ui.view === 'grid' ? 'act' : ''}">Grid</button>`;
+  $nav.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => openSession(m, b.dataset.s));
+  $nav.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => { ui.view = b.dataset.view; renderMeeting(m); });
+  document.getElementById('addSession').onclick = () => {
+    const s = store.newSession();
+    m.sessions.push(s);
+    touch(m);
+    openSession(m, s.id);
+  };
+  $nav.querySelector('.act')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+
+  if (ui.view === 'grid') return renderGrid(m);
+  if (ui.view === 'log') return renderLog(m);
+  renderSessionForm(m, sess);
 }
 
-function previousFilled(m, idx) {
-  for (let i = idx - 1; i >= 0; i--) {
-    if (store.sessionHasData(m.sessions[SESSIONS[i].id])) return SESSIONS[i];
+function previousFilled(m, sess) {
+  for (let i = m.sessions.indexOf(sess) - 1; i >= 0; i--) {
+    if (store.sessionHasData(m.sessions[i])) return m.sessions[i];
   }
   return null;
 }
@@ -178,47 +201,93 @@ function inputHTML(field, side, value) {
     </div>`;
 }
 
-function renderSessionForm(m, sess, idx, body) {
-  const s = m.sessions[sess.id];
-  const prev = previousFilled(m, idx);
+function casterRowHTML(s) {
+  const { top, bottom } = store.getCaster(s);
+  const deg = casterDegrees(top, bottom);
+  return `
+    <div class="frow caster">
+      <div class="flabel">Caster</div>
+      <div class="caster-ctl">
+        <div class="seg" id="casterTop">
+          ${CASTER_TOP.map((t) => `<button data-v="${t}" class="${t === top ? 'act' : ''}">${t}</button>`).join('')}
+        </div>
+        <select id="casterBottom" aria-label="Caster bottom position">
+          <option value="" ${bottom === '' ? 'selected' : ''}>–</option>
+          ${CASTER_BOTTOM.map((o) => `<option value="${o}" ${String(o) === String(bottom) ? 'selected' : ''}>${signed(o)}</option>`).join('')}
+        </select>
+        <div class="caster-out" id="casterOut">${deg == null ? '–' : deg.toFixed(1) + '°'}</div>
+      </div>
+      <div class="caster-lbl mute"><span>Top</span><span>Bottom</span><span></span></div>
+    </div>`;
+}
 
-  body.innerHTML = `
-    <div class="toolbar">
-      ${prev ? `<button class="btn small" id="copyPrev">Copy from ${prev.label}</button>` : '<span></span>'}
-      <label class="switch"><input type="checkbox" id="wets" ${s.wets ? 'checked' : ''}><span>Wets</span></label>
+function renderSessionForm(m, s) {
+  const prev = previousFilled(m, s);
+
+  $app.innerHTML = `
+    <div class="card times">
+      <label class="time name"><span>Session</span>
+        <input id="sessName" value="${esc(s.name)}" placeholder="${esc(store.defaultSessionName(m, s) || 'Name, e.g. Test 1')}"
+          autocomplete="off" autocapitalize="words" class="${store.defaultSessionName(m, s) ? 'has-default' : ''}"></label>
+      ${TIMES.map((t) => `
+        <label class="time"><span>${t.label}</span>
+          <input data-time="${t.id}" value="${esc(store.getVal(s, t))}" inputmode="decimal" autocomplete="off" placeholder="–"></label>`).join('')}
+    </div>
+    <div class="row">
+      ${prev ? `<button id="copyPrev" style="flex:1 1 100%">Copy setup from ${esc(label(m, prev))}</button>` : ''}
+      <button id="saveSetup" style="flex:1">Save setup</button>
+      <button id="loadSetup" style="flex:1">Load setup</button>
     </div>
     <div id="changes"></div>
-    <div class="form">
+    <div class="card form">
       <div class="form-head"><span></span><span>Front</span><span>Rear</span></div>
-      ${FIELDS.map((f) => `
-        <div class="frow ${f.single ? 'single' : ''}">
+      ${FIELDS.map((f) => f.kind === 'caster' ? casterRowHTML(s) : `
+        <div class="frow">
           <div class="flabel">${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}
             ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</div>
-          ${f.single
-            ? inputHTML(f, 'v', store.getVal(s, f))
-            : inputHTML(f, 'f', store.getVal(s, f, 'f')) + inputHTML(f, 'r', store.getVal(s, f, 'r'))}
+          ${['f', 'r'].map((side) => f.sides.includes(side)
+            ? inputHTML(f, side, store.getVal(s, f, side))
+            : '<div class="cell na"></div>').join('')}
         </div>`).join('')}
     </div>
-    <label class="notes">
-      <span>Notes</span>
+    <div class="card">
+      <h3>Notes</h3>
       <textarea id="notes" rows="5" placeholder="How did it feel? What changed?">${esc(s.notes)}</textarea>
-    </label>`;
+    </div>`;
 
-  body.querySelectorAll('input[data-field]').forEach((el) => {
+  const changed = () => { touch(m); markChip(m, s); renderChanges(m, s, prev); };
+
+  // Session name: blank by default; the next session's tab follows it ("Test 1" -> "Test 2").
+  document.getElementById('sessName').addEventListener('input', (e) => {
+    s.name = e.target.value;
+    touch(m);
+    const i = m.sessions.indexOf(s);
+    for (const x of m.sessions.slice(i, i + 2)) {
+      const b = $nav.querySelector(`[data-s="${x.id}"]`);
+      if (b) { b.textContent = label(m, x); b.classList.toggle('unnamed', !x.name.trim() && !store.defaultSessionName(m, x)); }
+    }
+  });
+
+  $app.querySelectorAll('input[data-field]').forEach((el) => {
     el.addEventListener('input', () => {
       const f = FIELDS.find((x) => x.id === el.dataset.field);
       store.setVal(s, f, el.dataset.side, el.value.trim());
-      touch(m);
-      markChip(m, sess);
-      renderChanges(m, sess, prev);
+      changed();
     });
     el.addEventListener('focus', () => el.select());
   });
-  body.querySelectorAll('[data-sign]').forEach((btn) => {
+  $app.querySelectorAll('input[data-time]').forEach((el) => {
+    el.addEventListener('input', () => {
+      store.setVal(s, TIMES.find((t) => t.id === el.dataset.time), 'v', el.value.trim());
+      touch(m); markChip(m, s);
+    });
+    el.addEventListener('focus', () => el.select());
+  });
+  $app.querySelectorAll('[data-sign]').forEach((btn) => {
     btn.addEventListener('pointerdown', (e) => e.preventDefault()); // keep keyboard focus
     btn.addEventListener('click', () => {
       const [fid, side] = btn.dataset.sign.split(':');
-      const input = body.querySelector(`input[data-field="${fid}"][data-side="${side}"]`);
+      const input = $app.querySelector(`input[data-field="${fid}"][data-side="${side}"]`);
       let v = input.value.trim();
       if (v.startsWith('-') || v.startsWith('−')) v = v.slice(1);
       else if (v.startsWith('+')) v = '-' + v.slice(1);
@@ -227,124 +296,142 @@ function renderSessionForm(m, sess, idx, body) {
       input.dispatchEvent(new Event('input'));
     });
   });
-  renderChanges(m, sess, prev);
-  document.getElementById('notes').addEventListener('input', (e) => {
-    s.notes = e.target.value; touch(m); markChip(m, sess);
+
+  // Caster: pick top and bottom positions, degrees are calculated.
+  const updateCaster = () => {
+    const { top, bottom } = store.getCaster(s);
+    const deg = casterDegrees(top, bottom);
+    document.getElementById('casterOut').textContent = deg == null ? '–' : deg.toFixed(1) + '°';
+    changed();
+  };
+  document.querySelectorAll('#casterTop button').forEach((b) => b.onclick = () => {
+    const cur = store.getCaster(s);
+    const top = cur.top === b.dataset.v ? '' : b.dataset.v; // tap again to clear
+    s.values.caster = { ...cur, top };
+    document.querySelectorAll('#casterTop button').forEach((x) => x.classList.toggle('act', x.dataset.v === top));
+    updateCaster();
   });
-  document.getElementById('wets').addEventListener('change', (e) => { s.wets = e.target.checked; touch(m); });
+  document.getElementById('casterBottom').onchange = (e) => {
+    s.values.caster = { ...store.getCaster(s), bottom: e.target.value };
+    updateCaster();
+  };
+
+  document.getElementById('saveSetup').onclick = () => saveSetupSheet(m, s);
+  document.getElementById('loadSetup').onclick = () => loadSetupSheet(m, s);
+
+  renderChanges(m, s, prev);
+  document.getElementById('notes').addEventListener('input', (e) => {
+    s.notes = e.target.value; touch(m); markChip(m, s);
+  });
 
   if (prev) {
     document.getElementById('copyPrev').onclick = () => {
-      if (store.sessionHasData(s) && !confirm(`Replace ${sess.label} values with ${prev.label}? Notes are kept.`)) return;
-      const src = m.sessions[prev.id];
-      const values = JSON.parse(JSON.stringify(src.values));
-      delete values.time; // lap times belong to the session they were set in
-      s.values = values;
-      s.wets = src.wets;
+      if (store.sessionHasData(s) && !confirm(`Replace this setup with ${label(m, prev)}? Times and notes are kept.`)) return;
+      store.applySetup(s, prev.values);
       touch(m);
       renderMeeting(m);
-      toast(`Copied setup from ${prev.label}`);
+      toast(`Copied setup from ${label(m, prev)}`);
     };
   }
 }
 
+function markChip(m, s) {
+  $nav.querySelector(`[data-s="${s.id}"]`)?.classList.toggle('has', store.sessionHasData(s));
+}
+
 const sideLabel = (side) => (side === 'f' ? 'F' : side === 'r' ? 'R' : '');
+// Only show F/R in the change record where a row has both.
+const fieldSide = (field, side) => (field.sides.length > 1 ? ' ' + sideLabel(side) : '');
 
 function changeListHTML(diffs) {
-  return `<ul class="changes-list">${diffs.map((d) => `
-    <li><span class="cl-field">${esc(d.field.label)} ${sideLabel(d.side)}</span>
-      <span class="cl-from">${esc(d.from) || '—'}</span><span class="cl-arrow">→</span><span class="cl-to">${esc(d.to) || '—'}</span></li>`).join('')}</ul>`;
+  return `<table class="changes">${diffs.map((d) => `
+    <tr><td>${esc(d.field.label)}${fieldSide(d.field, d.side)}</td>
+      <td class="from">${esc(d.from) || '–'}</td><td class="arrow">→</td><td class="to">${esc(d.to) || '–'}</td></tr>`).join('')}</table>`;
 }
 
-// Live "what changed vs the previous session" card at the top of the session form.
-function renderChanges(m, sess, prev) {
+function renderChanges(m, s, prev) {
   const el = document.getElementById('changes');
   if (!el) return;
-  const cur = m.sessions[sess.id];
-  if (!prev || !store.sessionHasData(cur)) { el.innerHTML = ''; return; }
-  const diffs = store.diffSessions(m.sessions[prev.id], cur);
+  if (!prev || !store.sessionHasData(s)) { el.innerHTML = ''; return; }
+  const diffs = store.diffSessions(prev, s);
   el.innerHTML = `
-    <section class="changes-card">
-      <h3>Changes from ${esc(prev.label)}</h3>
-      ${diffs.length ? changeListHTML(diffs) : '<p class="muted small">No setup changes.</p>'}
-    </section>`;
+    <div class="card changes-card">
+      <h3>Changes from ${esc(label(m, prev))}</h3>
+      ${diffs.length ? changeListHTML(diffs) : '<div class="mute">No setup changes.</div>'}
+    </div>`;
 }
 
-// Event changes record: every session in order, what changed going into it, its times and notes.
-function renderLog(m, body) {
-  const filled = SESSIONS.filter((s) => store.sessionHasData(m.sessions[s.id]));
+function timesLine(s) {
+  const t = store.getVal(s, TIMES[0]), rt = store.getVal(s, TIMES[1]);
+  if (!t && !rt) return '';
+  return `<span class="log-time">${esc(t)}${rt ? ` <span class="mute">ref ${esc(rt)}</span>` : ''}</span>`;
+}
+
+// Changes record: every session in order, what changed going into it, times and notes.
+function renderLog(m) {
+  const filled = m.sessions.filter((s) => store.sessionHasData(s));
   if (!filled.length) {
-    body.innerHTML = '<div class="empty"><p>No sessions recorded yet.</p></div>';
+    $app.innerHTML = '<div class="card"><div class="mute">No sessions recorded yet.</div></div>';
     return;
   }
-  const timeF = FIELDS.find((f) => f.id === 'time');
-  const refF = FIELDS.find((f) => f.id === 'refTime');
-  body.innerHTML = `<ol class="log">${filled.map((s, i) => {
-    const cur = m.sessions[s.id];
+  $app.innerHTML = filled.map((s, i) => {
     const prev = i > 0 ? filled[i - 1] : null;
-    const diffs = prev ? store.diffSessions(m.sessions[prev.id], cur) : null;
-    const t = store.getVal(cur, timeF), rt = store.getVal(cur, refF);
+    const diffs = prev ? store.diffSessions(prev, s) : null;
     return `
-      <li class="log-item">
-        <div class="log-head">
-          <a href="#/m/${m.id}/${s.id}" data-sess class="log-title">${s.label}${cur.wets ? ' <span class="wet-tag">WETS</span>' : ''}</a>
-          ${t || rt ? `<span class="log-time">${t ? esc(t) : ''}${rt ? ` <span class="muted">ref ${esc(rt)}</span>` : ''}</span>` : ''}
-        </div>
+      <div class="card">
+        <div class="log-head"><button class="link" data-s="${s.id}">${esc(label(m, s))}</button>${timesLine(s)}</div>
         ${prev
-          ? (diffs.length ? changeListHTML(diffs) : `<p class="muted small">No changes from ${prev.label}.</p>`)
-          : '<p class="muted small">Baseline setup.</p>'}
-        ${cur.notes ? `<p class="log-notes">${esc(cur.notes)}</p>` : ''}
-      </li>`;
-  }).join('')}</ol>`;
-  body.querySelectorAll('[data-sess]').forEach((a) => a.addEventListener('click', () => { ui.view = 'session'; }));
+          ? (diffs.length ? changeListHTML(diffs) : `<div class="mute">No changes from ${esc(label(m, prev))}.</div>`)
+          : '<div class="mute">Baseline setup.</div>'}
+        ${s.notes ? `<div class="log-notes">${esc(s.notes)}</div>` : ''}
+      </div>`;
+  }).join('');
+  $app.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => openSession(m, b.dataset.s));
 }
 
-function markChip(m, sess) {
-  const chip = document.querySelector(`#sessions a[href$="/${sess.id}"]`);
-  chip?.classList.toggle('has', store.sessionHasData(m.sessions[sess.id]));
-}
-
-function renderGrid(m, body) {
-  const cols = [];
-  for (const s of SESSIONS) cols.push(s);
+function renderGrid(m) {
+  const cols = m.sessions;
+  // Highlight values that differ from the previous session that had a value.
   const cell = (s, f, side) => {
-    const sess = m.sessions[s.id];
-    const v = store.getVal(sess, f, side);
-    // highlight values that changed from the previous session that had a value
-    const i = SESSIONS.indexOf(s);
+    const v = store.display(s, f, side);
     let changed = false;
     if (v) {
-      for (let j = i - 1; j >= 0; j--) {
-        const pv = store.getVal(m.sessions[SESSIONS[j].id], f, side);
+      for (let j = cols.indexOf(s) - 1; j >= 0; j--) {
+        const pv = store.display(cols[j], f, side);
         if (pv) { changed = pv !== v; break; }
       }
     }
-    return `<td class="${changed ? 'changed' : ''}">${esc(v)}</td>`;
+    return `<td class="${changed ? 'chg' : ''} ${side === 'r' || f.sides.length === 1 ? 'edge' : ''}">${esc(v)}</td>`;
   };
+  const rowFor = (f) => `
+    <tr><th class="stick">${esc(f.label)}${f.sides.length === 1 ? ` <span class="mute">${sideLabel(f.sides[0])}</span>` : ''}</th>
+      ${cols.map((s) => f.sides.length === 1
+        ? cell(s, f, f.sides[0]).replace('<td', '<td colspan="2"')
+        : cell(s, f, 'f') + cell(s, f, 'r')).join('')}</tr>`;
 
-  body.innerHTML = `
-    <p class="muted small pad">Highlighted cells changed from the previous session. Tap a session name to edit it.</p>
+  $app.innerHTML = `
+    <div class="mute" style="margin:4px 0 8px">Green cells changed from the previous session. Tap a session to edit it.</div>
     <div class="grid-wrap">
       <table class="grid">
         <thead>
           <tr><th class="stick"></th>${cols.map((s) =>
-            `<th colspan="2" class="${m.sessions[s.id].wets ? 'wet' : ''}"><a href="#/m/${m.id}/${s.id}" data-sess>${s.label}${m.sessions[s.id].wets ? ' 💧' : ''}</a></th>`).join('')}</tr>
-          <tr><th class="stick"></th>${cols.map(() => '<th class="fr">F</th><th class="fr">R</th>').join('')}</tr>
+            `<th colspan="2" class="edge"><button class="link" data-s="${s.id}">${esc(label(m, s))}</button></th>`).join('')}</tr>
         </thead>
         <tbody>
-          ${FIELDS.map((f) => `
-            <tr><th class="stick">${esc(f.label)}</th>${cols.map((s) => f.single
-              ? `<td colspan="2" class="span">${esc(store.getVal(m.sessions[s.id], f))}</td>`
-              : cell(s, f, 'f') + cell(s, f, 'r')).join('')}</tr>`).join('')}
-          <tr class="notes-row"><th class="stick">Notes</th>${cols.map((s) =>
-            `<td colspan="2" class="note">${esc(m.sessions[s.id].notes)}</td>`).join('')}</tr>
+          ${TIMES.map((t) => `
+            <tr class="time-row"><th class="stick">${t.label}</th>${cols.map((s) =>
+              `<td colspan="2" class="edge">${esc(store.getVal(s, t))}</td>`).join('')}</tr>`).join('')}
+          <tr class="sub"><th class="stick"></th>${cols.map(() => '<th>F</th><th class="edge">R</th>').join('')}</tr>
+          ${FIELDS.map(rowFor).join('')}
+          <tr><th class="stick">Notes</th>${cols.map((s) =>
+            `<td colspan="2" class="note edge">${esc(s.notes)}</td>`).join('')}</tr>
         </tbody>
       </table>
     </div>`;
-  body.querySelectorAll('[data-sess]').forEach((a) => a.addEventListener('click', () => { ui.view = 'session'; }));
+  $app.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => openSession(m, b.dataset.s));
 }
 
-// ---------- Sheets / dialogs ----------
+// ---------- Sheets ----------
 function sheet(html) {
   const d = document.createElement('dialog');
   d.className = 'sheet';
@@ -359,16 +446,11 @@ function sheet(html) {
 function openDetails(m, isNew = false) {
   const d = sheet(`
     <form method="dialog" class="sheet-body">
-      <h2>${isNew ? 'New event' : 'Event details'}</h2>
-      <label class="field"><span>Track</span>
-        <input name="track" value="${esc(m.track)}" placeholder="e.g. Whilton Mill" autocapitalize="words"></label>
-      <label class="field"><span>Date</span>
-        <input name="date" type="date" value="${esc(m.date)}"></label>
-      <label class="field"><span>Class / kart</span>
-        <input name="kartClass" value="${esc(m.kartClass)}" placeholder="e.g. Junior Rotax" autocapitalize="words"></label>
-      <div class="row gap end">
-        <button class="btn primary" value="save">Done</button>
-      </div>
+      <h3>${isNew ? 'New event' : 'Event details'}</h3>
+      <label class="field">Track<input name="track" value="${esc(m.track)}" placeholder="e.g. Whilton Mill" autocapitalize="words"></label>
+      <label class="field">Date<input name="date" type="date" value="${esc(m.date)}"></label>
+      <label class="field">Class / kart<input name="kartClass" value="${esc(m.kartClass)}" placeholder="e.g. Junior Rotax" autocapitalize="words"></label>
+      <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
     </form>`);
   if (isNew) d.querySelector('[name=track]').focus();
   d.querySelector('form').addEventListener('submit', () => {
@@ -382,110 +464,152 @@ function openDetails(m, isNew = false) {
   });
 }
 
-function openMenu(m) {
+function openMenu(m, sess) {
+  const canDelete = ui.view === 'session' && m.sessions.length > 1;
   const d = sheet(`
-    <div class="sheet-body menu">
-      <button class="btn block" data-a="details">Edit details</button>
-      <button class="btn block" data-a="carry">New event from this setup</button>
-      <button class="btn block danger" data-a="delete">Delete event</button>
-      <button class="btn block ghost" data-a="cancel">Cancel</button>
+    <div class="sheet-body">
+      <button data-a="details">Edit event details</button>
+      ${canDelete ? `<button data-a="delSession" class="danger">Delete session "${esc(label(m, sess))}"</button>` : ''}
+      <button data-a="carry">New event from this setup</button>
+      <button data-a="delete" class="danger">Delete event</button>
+      <button data-a="cancel">Cancel</button>
     </div>`);
   d.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => {
     const a = b.dataset.a;
     d.close();
     if (a === 'details') openDetails(m);
     if (a === 'carry') carryForward(m);
-    if (a === 'delete') {
-      if (confirm(`Delete "${m.track || 'Untitled event'}"? This cannot be undone.`)) {
-        state.meetings = state.meetings.filter((x) => x !== m);
-        store.save(state, true);
-        location.hash = '#/';
-      }
+    if (a === 'delSession' && confirm(`Delete session "${label(m, sess)}"? This cannot be undone.`)) {
+      const i = m.sessions.indexOf(sess);
+      m.sessions.splice(i, 1);
+      touch(m);
+      openSession(m, m.sessions[Math.max(0, i - 1)].id);
+    }
+    if (a === 'delete' && confirm(`Delete "${m.track || 'Untitled event'}"? This cannot be undone.`)) {
+      state.meetings = state.meetings.filter((x) => x !== m);
+      store.save(state, true);
+      location.hash = '#/';
     }
   }));
 }
 
-// Start a new meeting using the last session with data as the Test 1 baseline.
+// ---------- Saved setups ----------
+const savedSetupsSorted = () => [...state.setups].sort((a, b) => b.savedAt - a.savedAt);
+const setupMeta = (x) => [x.track, x.kartClass, new Date(x.savedAt).toLocaleDateString()].filter(Boolean).join(' · ');
+
+function saveSetupSheet(m, s) {
+  const suggested = [m.track, label(m, s)].filter(Boolean).join(' – ');
+  const d = sheet(`
+    <form method="dialog" class="sheet-body">
+      <h3>Save setup</h3>
+      <label class="field">Name<input name="name" value="${esc(suggested)}" placeholder="e.g. Whilton dry baseline" autocapitalize="words"></label>
+      <div class="mute">Saves this session's setup (not times or notes) so you can load it into any session later.</div>
+      <div class="row"><button class="pri" value="save" style="flex:1">Save</button></div>
+    </form>`);
+  const inp = d.querySelector('[name=name]');
+  inp.focus(); inp.select();
+  d.querySelector('form').addEventListener('submit', () => {
+    const name = inp.value.trim() || suggested || 'Setup';
+    const existing = state.setups.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (existing && !confirm(`Replace the saved setup "${existing.name}"?`)) return;
+    const entry = { id: existing?.id || store.uid(), name, track: m.track, kartClass: m.kartClass,
+      values: store.setupValues(s), savedAt: Date.now() };
+    state.setups = state.setups.filter((x) => x !== existing);
+    state.setups.push(entry);
+    store.save(state, true);
+    toast(`Saved "${name}"`);
+  });
+}
+
+function loadSetupSheet(m, s) {
+  const list = savedSetupsSorted();
+  const d = sheet(`
+    <div class="sheet-body">
+      <h3>Load setup into ${esc(label(m, s))}</h3>
+      ${list.length ? list.map((x) => `
+        <button class="saved-pick" data-id="${x.id}"><span>${esc(x.name)}</span><span class="mute">${esc(setupMeta(x))}</span></button>`).join('')
+        : '<div class="mute">No saved setups yet. Use “Save setup” on a session first.</div>'}
+      <button data-a="cancel">Cancel</button>
+    </div>`);
+  d.querySelector('[data-a=cancel]').onclick = () => d.close();
+  d.querySelectorAll('[data-id]').forEach((b) => b.onclick = () => {
+    const x = state.setups.find((y) => y.id === b.dataset.id);
+    d.close();
+    if (store.sessionHasData(s) && !confirm(`Replace this session's setup with "${x.name}"? Times and notes are kept.`)) return;
+    store.applySetup(s, x.values);
+    touch(m);
+    store.save(state, true);
+    renderMeeting(m);
+    toast(`Loaded "${x.name}"`);
+  });
+}
+
+// Start a new event using the last session with data as the first session's setup.
 function carryForward(m) {
-  const last = [...SESSIONS].reverse().find((s) => store.sessionHasData(m.sessions[s.id]));
+  const last = [...m.sessions].reverse().find((s) => store.sessionHasData(s));
   const n = store.newMeeting({ track: m.track, kartClass: m.kartClass });
   if (last) {
-    const values = JSON.parse(JSON.stringify(m.sessions[last.id].values));
-    delete values.time;
-    n.sessions.t1.values = values;
+    n.sessions[0].values = store.setupValues(last);
   }
   state.meetings.push(n);
   store.save(state, true);
-  ui.session = 't1'; ui.view = 'session';
+  ui.session = n.sessions[0].id; ui.view = 'session';
   location.hash = `#/m/${n.id}`;
   setTimeout(() => openDetails(n, true), 50);
-  if (last) toast(`Test 1 pre-filled from ${last.label}`);
+  if (last) toast(`First session pre-filled from ${label(m, last)}`);
 }
 
 // ---------- Reference ----------
 function renderRef() {
+  $hdr.innerHTML = `${LOGO}<h1>KARTIFY</h1>`;
+  topNav('ref');
   $app.innerHTML = `
-    <header class="bar"><h1>Reference</h1></header>
-    <main class="content ref">
-      <section class="panel">
-        <h2>Caster calculator</h2>
-        <div class="row gap wrap">
-          <div class="seg" id="casterPos">
-            <button data-v="FWD">FWD</button><button data-v="BACK" class="on">BACK</button>
-          </div>
-          <select id="casterOff" aria-label="Offset">
-            ${CASTER_OFFSETS.map((o) => `<option value="${o}" ${o === 0 ? 'selected' : ''}>${o > 0 ? '+' + o : o}</option>`).join('')}
-          </select>
-        </div>
-        <div class="big" id="casterOut"></div>
-        <p class="muted small">16.5° base, +3° when BACK, plus offset.</p>
-      </section>
-
-      <section class="panel">
-        <h2>Stub position <span class="muted small">(LHS)</span></h2>
-        <div class="stub">
-          <span style="grid-area:a">1</span>
-          <span style="grid-area:b">2</span>
-          <span style="grid-area:c">3</span>
-          <span style="grid-area:d">4</span>
-          <span style="grid-area:e">5</span>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2>Sign conventions</h2>
-        <table class="legend">
-          <tr><th>Camber</th><td><b>+</b> positive</td><td><b>−</b> negative</td></tr>
-          <tr><th>Toe</th><td><b>+</b> out</td><td><b>−</b> in</td></tr>
-          <tr><th>Brake pos</th><td colspan="2"><b>1</b> = top</td></tr>
-        </table>
-      </section>
-    </main>`;
-
-  let pos = 'BACK';
-  const out = document.getElementById('casterOut');
-  const off = document.getElementById('casterOff');
-  const update = () => { out.textContent = casterDegrees(pos, off.value).toFixed(1) + '°'; };
-  document.querySelectorAll('#casterPos button').forEach((b) => b.addEventListener('click', () => {
-    pos = b.dataset.v;
-    document.querySelectorAll('#casterPos button').forEach((x) => x.classList.toggle('on', x === b));
+    <div class="card">
+      <h3>Caster</h3>
+      <label>Top<div class="seg" id="rTop">${CASTER_TOP.map((t) =>
+        `<button data-v="${t}" class="${t === 'BACK' ? 'act' : ''}">${t}</button>`).join('')}</div></label>
+      <label>Bottom<select id="rBottom">${CASTER_BOTTOM.map((o) =>
+        `<option value="${o}" ${o === 0 ? 'selected' : ''}>${signed(o)}</option>`).join('')}</select></label>
+      <div class="res" id="rOut"></div>
+      <div class="mute" style="text-align:center">16.5° base, +3° when top is BACK, plus bottom position.</div>
+    </div>
+    <div class="card">
+      <h3>Stub position (LHS)</h3>
+      <div class="stub">
+        <span style="grid-area:a">1</span><span style="grid-area:b">2</span><span style="grid-area:c">3</span>
+        <span style="grid-area:d">4</span><span style="grid-area:e">5</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Sign conventions</h3>
+      <table>
+        <tr><td>Camber</td><td><b>+</b> positive</td><td><b>−</b> negative</td></tr>
+        <tr><td>Toe</td><td><b>+</b> out</td><td><b>−</b> in</td></tr>
+        <tr><td>Brake pos</td><td colspan="2"><b>1</b> = top</td></tr>
+      </table>
+    </div>`;
+  let top = 'BACK';
+  const bottom = document.getElementById('rBottom');
+  const update = () => { document.getElementById('rOut').textContent = casterDegrees(top, bottom.value).toFixed(1) + '°'; };
+  document.querySelectorAll('#rTop button').forEach((b) => b.onclick = () => {
+    top = b.dataset.v;
+    document.querySelectorAll('#rTop button').forEach((x) => x.classList.toggle('act', x === b));
     update();
-  }));
-  off.addEventListener('change', update);
+  });
+  bottom.onchange = update;
   update();
 }
 
 // ---------- Misc ----------
+let toastTimer;
 function toast(msg) {
-  const t = document.createElement('div');
-  t.className = 'toast';
+  const t = document.getElementById('toast');
   t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.classList.add('show'), 10);
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2200);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-// Flush pending saves when the app is backgrounded.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') store.save(state, true);
 });
