@@ -9,7 +9,7 @@ full screen and works offline at the track.
 - **Events**: one per race meeting or test day (track, date, class).
 - **Sessions**: each event starts with 7 blank, numbered session tabs (add more with **+**). Name a
   session (e.g. "Test 1") and only the next tab defaults to "Test 2" until you type over it.
-- **Session info** at the top of each session: tyre (carries forward), lap time, ref time and a short comment. All show in the Grid.
+- **Session info** at the top of each session: tyre (carries forward), a short comment, lap time and ref time. All show in the Grid.
 - **Setup**: only the adjustable Front/Rear cells from the spreadsheet (greyed-out cells are left out).
   Camber is a number plus POS/NEG, toe a number plus IN/OUT, steering yoke LONG (= hard) / SHORT (= soft),
   stub pos 1–5, wheelbase S/M/L, 3rd IN/OUT (rear), front bar OUT/NYLON/STEEL, pinion 10–14. Caster is entered as top (−4…+4) and bottom (FWD/BACK) positions and the degrees are calculated.
