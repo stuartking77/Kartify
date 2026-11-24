@@ -82,7 +82,7 @@ export function display(session, field, side = 'v', long = false) {
   }
   if (field.kind === 'choice') {
     const v = getVal(session, field, side);
-    const o = field.options.find((x) => x.v === v);
+    const o = field.options.find((x) => typeof x === 'object' && x.v === v);
     return o ? `${o.v} (${o.note})` : v;
   }
   return getVal(session, field, side);

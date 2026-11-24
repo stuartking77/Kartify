@@ -18,8 +18,8 @@ export const TIMES = [
 // kind: 'num'    -> numeric keypad
 //       'text'   -> full keyboard
 //       'dir'    -> number plus a direction button (camber POS/NEG, toe IN/OUT)
-//       'choice' -> pick one of `options` (steering yoke)
-//       'select' -> drop-down of `options` (stub pos)
+//       'choice' -> buttons, pick one of `options` (steering yoke, wheelbase, 3rd, front bar)
+//       'select' -> drop-down of `options` (stub pos, pinion)
 //       'caster' -> top / bottom positions, caster degrees calculated
 export const FIELDS = [
   { id: 'hotPressure',  label: 'Hot pressure', kind: 'num', unit: 'psi', sides: ['f', 'r'] },
@@ -30,14 +30,14 @@ export const FIELDS = [
     options: [{ v: 'LONG', note: 'HARD' }, { v: 'SHORT', note: 'SOFT' }] },
   { id: 'stubPos',      label: 'Stub pos', kind: 'select', options: ['1', '2', '3', '4', '5'], ref: 'stub', sides: ['f'] },
   { id: 'width',        label: 'Width', kind: 'num', sides: ['f', 'r'] },
-  { id: 'wbase',        label: 'Wheelbase', kind: 'text', sides: ['r'] },
+  { id: 'wbase',        label: 'Wheelbase', kind: 'choice', options: ['S', 'M', 'L'], sides: ['r'] },
   { id: 'seatH',        label: 'Seat height', kind: 'text', sides: ['r'] },
   { id: 'weightDist',   label: 'Weight dist', kind: 'num', sides: ['r'] },
   { id: 'rideH',        label: 'Ride height', kind: 'text', sides: ['f', 'r'] },
-  { id: 'third',        label: '3rd', kind: 'text', sides: ['f', 'r'] },
-  { id: 'fBar',         label: 'Front bar', kind: 'text', sides: ['f', 'r'] },
+  { id: 'third',        label: '3rd', kind: 'choice', options: ['IN', 'OUT'], sides: ['r'] },
+  { id: 'fBar',         label: 'Front bar', kind: 'choice', options: ['OUT', 'NYLON', 'STEEL'], sides: ['f'] },
   { id: 'jet',          label: 'Jet', kind: 'num', sides: ['r'] },
-  { id: 'pinion',       label: 'Pinion', kind: 'num', sides: ['r'] },
+  { id: 'pinion',       label: 'Pinion', kind: 'select', options: ['10', '11', '12', '13', '14'], sides: ['r'] },
   { id: 'sprocket',     label: 'Sprocket', kind: 'num', sides: ['r'] },
   { id: 'brkPedal',     label: 'Brake pedal', kind: 'num', hint: '1 = top', ref: 'brake', sides: ['r'] },
   { id: 'brkCyl',       label: 'Brake cyl', kind: 'text', sides: ['r'] },

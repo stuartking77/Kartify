@@ -287,12 +287,15 @@ function rowHTML(f, s) {
       </div>`;
   }
   if (f.kind === 'choice') {
-    return `<div class="frow wide">${labelHTML(f)}<div class="wide-ctl">${segHTML(f.id, 'f', f.options, v.f || '')}</div></div>`;
+    const side = f.sides[0];
+    return `<div class="frow wide">${labelHTML(f)}<div class="wide-ctl">${segHTML(f.id, side, f.options, v[side] || '')}</div></div>`;
   }
   if (f.kind === 'select') {
     return `
       <div class="frow">${labelHTML(f)}
-        <div class="cell">${selectHTML(f.id, 'f', f.options, v.f ?? '', f.label)}</div><div class="cell na"></div>
+        ${['f', 'r'].map((side) => f.sides.includes(side)
+          ? `<div class="cell">${selectHTML(f.id, side, f.options, v[side] ?? '', f.label)}</div>`
+          : '<div class="cell na"></div>').join('')}
       </div>`;
   }
   return `
