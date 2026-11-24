@@ -33,8 +33,13 @@ function touch(m, s) {
 // changes need entering. It stays "carried over" (not counted as used, refreshed from
 // the previous session each time it's opened) until something in it is edited.
 function carryOver(m, s) {
+  if (s.cleared) return; // cleared on purpose: stay empty
   const before = m.sessions[m.sessions.indexOf(s) - 1];
-  if (!before || before.inherited || !store.hasSetup(before)) return;
+  if (!before || before.inherited || !store.hasSetup(before)) {
+    // previous session no longer has a setup: drop the stale carried-over copy
+    if (s.inherited) { s.values = {}; delete s.inherited; store.save(state); }
+    return;
+  }
   if (!s.inherited && store.sessionHasData(s)) return;
   store.applySetup(s, before.values);
   s.inherited = true;
@@ -550,6 +555,8 @@ function openMenu(m, sess) {
   const d = sheet(`
     <div class="sheet-body">
       <button data-a="details">Edit event details</button>
+      ${ui.view === 'session' ? `<button data-a="clearSession">Clear session "${esc(label(m, sess))}"</button>` : ''}
+      <button data-a="clearAll">Clear all sessions</button>
       ${canDelete ? `<button data-a="delSession" class="danger">Delete session "${esc(label(m, sess))}"</button>` : ''}
       <button data-a="carry">New event from this setup</button>
       <button data-a="delete" class="danger">Delete event</button>
@@ -560,6 +567,21 @@ function openMenu(m, sess) {
     d.close();
     if (a === 'details') openDetails(m);
     if (a === 'carry') carryForward(m);
+    if (a === 'clearSession' && confirm(`Clear "${label(m, sess)}"? Its setup, times and notes are emptied; the tab and its name stay.`)) {
+      sess.values = {};
+      sess.notes = '';
+      delete sess.inherited;
+      sess.cleared = true; // don't refill from the previous session
+      touch(m);
+      renderMeeting(m);
+      toast('Session cleared');
+    }
+    if (a === 'clearAll' && confirm('Clear every session in this event? All setups, times, notes and session names are removed and you start again with 7 blank sessions. Track and date stay.')) {
+      m.sessions = store.newMeeting().sessions;
+      touch(m);
+      openSession(m, m.sessions[0].id);
+      toast('All sessions cleared');
+    }
     if (a === 'delSession' && confirm(`Delete session "${label(m, sess)}"? This cannot be undone.`)) {
       const i = m.sessions.indexOf(sess);
       m.sessions.splice(i, 1);
