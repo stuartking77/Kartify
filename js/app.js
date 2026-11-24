@@ -310,7 +310,8 @@ function rowHTML(f, s, inh) {
 
 function renderSessionForm(m, s) {
   const idx = m.sessions.indexOf(s);
-  const inh = store.effectiveBefore(m, s);
+  // Unchanged items are left blank (no carried values shown); Save setup pulls them through.
+  const inh = {};
 
   $app.innerHTML = `
     <div class="card times">
@@ -332,7 +333,7 @@ function renderSessionForm(m, s) {
     <div class="card form">
       <div class="form-head"><span></span><span>Front</span><span>Rear</span></div>
       ${FIELDS.map((f) => rowHTML(f, s, inh)).join('')}
-      ${idx > 0 ? '<div class="mute form-foot">Grey values are carried from earlier sessions. Only enter what changes.</div>' : ''}
+      ${idx > 0 ? '<div class="mute form-foot">Only enter what changes. Blank means the same as before.</div>' : ''}
     </div>
     <div class="card">
       <h3>Notes</h3>
@@ -370,10 +371,11 @@ function renderSessionForm(m, s) {
   // Caster degrees from the setup in force (this session's values, else carried ones).
   const updateCaster = () => {
     const out = document.getElementById('casterOut');
+    // Shown only when caster is changed in this session (a missing half comes from before).
+    const changedHere = store.hasOwn(s, FIELDS.find((f) => f.id === 'caster'));
     const { top, bottom } = store.getCaster({ values: store.effectiveAt(m, s) });
     const deg = casterDegrees(top, bottom);
-    out.textContent = deg == null ? '–' : deg.toFixed(1) + '°';
-    out.classList.toggle('inh', !store.hasOwn(s, FIELDS.find((f) => f.id === 'caster')));
+    out.textContent = changedHere && deg != null ? deg.toFixed(1) + '°' : '–';
   };
   updateCaster();
   const setPart = (fid, key, value) => {

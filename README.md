@@ -16,7 +16,7 @@ full screen and works offline at the track.
 - **Changes**: each session shows what changed from the previous one, and the *Grid* view shows every
   session side by side with changed cells highlighted.
 - **Only enter what changes**: each session stores just the values you change. Blank boxes carry the
-  value from the closest earlier session, shown in grey. *Save setup* saves the full setup in force at
+  value from the closest earlier session (left blank on screen). *Save setup* saves the full setup in force at
   that session, pulling every carried value through.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
