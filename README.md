@@ -18,6 +18,10 @@ full screen and works offline at the track.
 - **Only enter what changes**: each session stores just the values you change. Blank boxes carry the
   value from the closest earlier session (left blank on screen). *Save setup* saves the full setup in force at
   that session, pulling every carried value through.
+- **Tyre pressures**: tap *Hot pressure* in a session to open its pressure page. One tab per tyre run
+  that session (+ Tyre to add more), Front/Rear columns: Rim T, Cold set, Hot pressure and Target
+  (carries from that tyre's earlier session) in; Ref @ ref temp, Rise coeff, Corr delta and Corr cold out.
+  PSI per °C, ref temperature and the generic ref rise are set once per event.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.

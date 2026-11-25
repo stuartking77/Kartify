@@ -1,11 +1,12 @@
 import { FIELDS, TIMES, CASTER_TOP, CASTER_BOTTOM, casterDegrees, signed } from './schema.js';
 import * as store from './store.js';
+import * as P from './pressure.js';
 
 const state = store.load();
 const $app = document.getElementById('app');
 const $hdr = document.getElementById('hdr');
 const $nav = document.getElementById('nav');
-const ui = { session: null, view: 'session' }; // session: id; view: session | grid
+const ui = { session: null, view: 'session', tyre: null }; // view: session | pressure | grid
 
 const LOGO = `<svg class="logo" viewBox="0 0 86 86" aria-label="Shift Motorsport"><defs><mask id="sm_logo"><rect width="86" height="86" fill="#fff"/><path d="M25 0h5v30H0v-5h25zM56 0h5v61H0v-5h56z" fill="#000"/></mask></defs><rect width="86" height="86" rx="7" fill="var(--acc)" mask="url(#sm_logo)"/></svg>`;
 
@@ -44,7 +45,7 @@ window.addEventListener('hashchange', () => {
 });
 
 function openSession(m, sid) {
-  ui.view = 'session';
+  ui.view = ui.view === 'pressure' ? 'pressure' : 'session'; // stay on the pressure page when switching session
   ui.session = sid;
   const h = `#/m/${m.id}/${sid}`;
   if (location.hash === h) renderMeeting(m); else location.hash = h;
@@ -157,7 +158,7 @@ function renderMeeting(m) {
   $nav.className = 'strip';
   $nav.innerHTML = `
     ${m.sessions.map((s) => `
-      <button data-s="${s.id}" class="${s.id === ui.session && ui.view === 'session' ? 'act' : ''} ${store.sessionHasData(s) ? 'has' : ''} ${tabName(m, s) ? '' : 'unnamed'}">${esc(tabName(m, s) || m.sessions.indexOf(s) + 1)}</button>`).join('')}
+      <button data-s="${s.id}" class="${s.id === ui.session && ui.view !== 'grid' ? 'act' : ''} ${store.sessionHasData(s) ? 'has' : ''} ${tabName(m, s) ? '' : 'unnamed'}">${esc(tabName(m, s) || m.sessions.indexOf(s) + 1)}</button>`).join('')}
     <button id="addSession" aria-label="Add session">+</button>
     <span class="sep"></span>
     <button data-view="grid" class="${ui.view === 'grid' ? 'act' : ''}">Grid</button>`;
@@ -172,6 +173,7 @@ function renderMeeting(m) {
   $nav.querySelector('.act')?.scrollIntoView({ inline: 'center', block: 'nearest' });
 
   if (ui.view === 'grid') return renderGrid(m);
+  if (ui.view === 'pressure') return renderPressure(m, sess);
   renderSessionForm(m, sess);
 }
 
@@ -211,6 +213,7 @@ function selectHTML(fieldId, key, options, current, aria, inherited = '') {
 function labelHTML(f) {
   const inner = `${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}${f.ref ? ' <span class="info">i</span>' : ''}
     ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}`;
+  if (f.link) return `<button class="flabel ref" data-goto="${f.link}">${inner} <span class="go">›</span></button>`;
   return f.ref
     ? `<button class="flabel ref" data-ref="${f.ref}" aria-label="${esc(f.label)} reference">${inner}</button>`
     : `<div class="flabel">${inner}</div>`;
@@ -413,6 +416,7 @@ function renderSessionForm(m, s) {
     }
   }));
 
+  $app.querySelectorAll('[data-goto=pressure]').forEach((b) => b.onclick = () => { ui.view = 'pressure'; renderMeeting(m); window.scrollTo(0, 0); });
   document.getElementById('saveSetup').onclick = () => saveSetupSheet(m, s);
   document.getElementById('loadSetup').onclick = () => loadSetupSheet(m, s);
 
@@ -498,6 +502,109 @@ function renderGrid(m) {
   $app.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => openSession(m, b.dataset.s));
 }
 
+// ---------- Tyre pressures ----------
+const fmt = (v, d = 1) => (v == null || !isFinite(v) ? '–' : v.toFixed(d));
+const fmtSigned = (v, d = 1) => (v == null || !isFinite(v) ? '–' : (v > 0 ? '+' : '') + v.toFixed(d));
+
+function renderPressure(m, s) {
+  if (!s.tyres || !s.tyres.length) {
+    const tyreItem = TIMES.find((x) => x.id === 'tyre');
+    s.tyres = P.initialTyres(m, s, store.getVal(s, tyreItem) || store.carriedInfo(m, s, tyreItem));
+    store.save(state);
+  }
+  const t = s.tyres.find((x) => x.id === ui.tyre) || s.tyres[0];
+  ui.tyre = t.id;
+  const st = P.settingsOf(m);
+  const tyreLabel = (x) => x.name.trim() || `Tyre ${s.tyres.indexOf(x) + 1}`;
+  const CALC = [
+    { id: 'ref', label: `Ref @ ${st.refTemp}°`, f: (c) => fmt(c.ref, 2) },
+    { id: 'riseCoeff', label: 'Rise coeff', f: (c) => (c.riseCoeff == null ? '–' : (c.riseCoeff * 100).toFixed(1) + '%') },
+    { id: 'corrDelta', label: 'Corr delta', f: (c) => fmtSigned(c.corrDelta) },
+    { id: 'corrCold', label: 'Corr cold', f: (c) => fmt(c.corrCold), main: true },
+  ];
+
+  $app.innerHTML = `
+    <div class="ptop">
+      <button class="sm" id="toSetup">‹ Setup</button>
+      <div class="ptitle">Tyre pressures · ${esc(label(m, s))}</div>
+    </div>
+    <div class="tyre-tabs">
+      ${s.tyres.map((x) => `<button data-t="${x.id}" class="${x === t ? 'act' : ''} ${P.tyreHasData(x) ? 'has' : ''}">${esc(tyreLabel(x))}</button>`).join('')}
+      <button id="addTyre">+ Tyre</button>
+    </div>
+    <div class="card times">
+      <label class="time info-field"><span>Tyre</span>
+        <input id="tyreName" value="${esc(t.name)}" placeholder="e.g. Set 1 (new)" autocomplete="off" autocapitalize="words"></label>
+    </div>
+    <div class="card form">
+      <div class="form-head"><span></span><span>Front</span><span>Rear</span></div>
+      ${P.P_INPUTS.map((p) => `
+        <div class="frow">
+          <div class="flabel">${p.label} <span class="unit">${p.unit}</span>
+            ${p.id === 'target' ? '<div class="hint">grey = from earlier session</div>' : ''}</div>
+          ${['f', 'r'].map((side) => `
+            <div class="cell"><input data-p="${p.id}" data-side="${side}" value="${esc(t[side]?.[p.id] ?? '')}"
+              placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, side) : '')}" inputmode="decimal" autocomplete="off"></div>`).join('')}
+        </div>`).join('')}
+      <div class="calc-head">Calculated</div>
+      ${CALC.map((c) => `
+        <div class="frow calc ${c.main ? 'main' : ''}">
+          <div class="flabel">${c.label}</div>
+          ${['f', 'r'].map((side) => `<div class="cell out" data-calc="${c.id}" data-side="${side}"></div>`).join('')}
+        </div>`).join('')}
+    </div>
+    <div class="row"><button id="delTyre" class="sm danger">Delete ${esc(tyreLabel(t))}</button></div>
+    <div class="card">
+      <h3>Pressure settings (this event)</h3>
+      <label>PSI per °C rim temp<input class="small-in" data-set="psiPerDeg" value="${esc(st.psiPerDeg)}" inputmode="decimal"></label>
+      <label>Ref temperature (°C)<input class="small-in" data-set="refTemp" value="${esc(st.refTemp)}" inputmode="decimal"></label>
+      <label>Ref rise (generic)<input class="small-in" data-set="refRise" value="${esc(st.refRise)}" inputmode="decimal"></label>
+      <div class="mute">Rise coeff compares this tyre's hot/cold rise with the generic ref rise (1.1 = 10%).</div>
+    </div>`;
+
+  const updateCalc = () => {
+    for (const side of ['f', 'r']) {
+      const c = P.calc(m, s, t, side);
+      for (const k of CALC) $app.querySelector(`[data-calc="${k.id}"][data-side="${side}"]`).textContent = k.f(c);
+    }
+  };
+  updateCalc();
+
+  document.getElementById('toSetup').onclick = () => { ui.view = 'session'; renderMeeting(m); window.scrollTo(0, 0); };
+  $app.querySelectorAll('[data-t]').forEach((b) => b.onclick = () => { ui.tyre = b.dataset.t; renderPressure(m, s); });
+  document.getElementById('addTyre').onclick = () => {
+    const n = P.newTyre();
+    s.tyres.push(n); ui.tyre = n.id; touch(m); renderPressure(m, s);
+    document.getElementById('tyreName').focus();
+  };
+  document.getElementById('tyreName').addEventListener('input', (e) => {
+    t.name = e.target.value; touch(m);
+    $app.querySelector(`[data-t="${t.id}"]`).textContent = tyreLabel(t);
+  });
+  $app.querySelectorAll('input[data-p]').forEach((el) => {
+    el.addEventListener('input', () => {
+      t[el.dataset.side] = { ...(t[el.dataset.side] || {}), [el.dataset.p]: el.value.trim() };
+      touch(m); markChip(m, s); updateCalc();
+      $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
+    });
+    el.addEventListener('focus', () => el.select());
+  });
+  $app.querySelectorAll('input[data-set]').forEach((el) => {
+    el.addEventListener('input', () => {
+      m.pressure = { ...(m.pressure || {}) };
+      if (el.value.trim() === '') delete m.pressure[el.dataset.set]; else m.pressure[el.dataset.set] = el.value.trim();
+      touch(m); updateCalc();
+      if (el.dataset.set === 'refTemp') $app.querySelector('.frow.calc .flabel').textContent = `Ref @ ${P.settingsOf(m).refTemp}°`;
+    });
+  });
+  document.getElementById('delTyre').onclick = () => {
+    if (!confirm(`Delete ${tyreLabel(t)} from this session?`)) return;
+    s.tyres = s.tyres.filter((x) => x !== t);
+    if (!s.tyres.length) s.tyres.push(P.newTyre());
+    ui.tyre = null; touch(m); markChip(m, s); renderPressure(m, s);
+  };
+}
+
 // ---------- Sheets ----------
 function sheet(html) {
   const d = document.createElement('dialog');
@@ -551,6 +658,7 @@ function openMenu(m, sess) {
     if (a === 'clearSession' && confirm(`Clear "${label(m, sess)}"? Its changes, times and notes are removed, so it goes back to the setup carried from before. The tab and its name stay.`)) {
       sess.values = {};
       sess.notes = '';
+      sess.tyres = [];
       touch(m);
       renderMeeting(m);
       toast('Session cleared');

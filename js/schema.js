@@ -25,7 +25,7 @@ export const TIMES = [
 //       'select' -> drop-down of `options` (stub pos, pinion)
 //       'caster' -> top / bottom positions, caster degrees calculated
 export const FIELDS = [
-  { id: 'hotPressure',  label: 'Hot pressure', kind: 'num', unit: 'psi', sides: ['f', 'r'] },
+  { id: 'hotPressure',  label: 'Hot pressure', kind: 'num', unit: 'psi', link: 'pressure', sides: ['f', 'r'] },
   { id: 'camber',       label: 'Camber', kind: 'dir', options: ['POS', 'NEG'], sides: ['f'] },
   { id: 'caster',       label: 'Caster', kind: 'caster', ref: 'caster', sides: ['f'] },
   { id: 'toe',          label: 'Toe', kind: 'dir', options: ['IN', 'OUT'], sides: ['f'] },
