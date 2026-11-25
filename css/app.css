@@ -280,3 +280,8 @@ input.small-in{width:90px;text-align:center}
 .stepper{min-width:0}
 .stepper input{min-width:0;width:100%}
 .adj-line > *{min-width:0}
+
+/* No double-tap zoom on iPhone (rapid +/- taps), and inputs at 16px so focusing one doesn't zoom */
+html{touch-action:manipulation}
+button,input,select,textarea,label{touch-action:manipulation}
+input,select,textarea{font-size:16px !important}
