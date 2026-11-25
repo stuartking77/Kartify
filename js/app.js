@@ -339,7 +339,8 @@ function renderSessionForm(m, s) {
       ${idx > 0 ? '<div class="mute form-foot">Only enter what changes. Blank means the same as before.</div>' : ''}
     </div>
     <div class="card">
-      <h3>Notes</h3>
+      <div class="notes-head"><h3>Notes</h3>
+        ${SpeechRec ? '<button type="button" id="dictate" class="sm dictate">🎤 Dictate</button>' : ''}</div>
       <textarea id="notes" rows="5" placeholder="How did it feel? What changed?">${esc(s.notes)}</textarea>
     </div>`;
 
@@ -424,6 +425,9 @@ function renderSessionForm(m, s) {
   document.getElementById('notes').addEventListener('input', (e) => {
     s.notes = e.target.value; touch(m); markChip(m, s);
   });
+  document.getElementById('dictate')?.addEventListener('click', () => dictate(document.getElementById('notes'), (text) => {
+    s.notes = text; touch(m); markChip(m, s);
+  }));
 
 }
 
@@ -1039,6 +1043,43 @@ function carryForward(m) {
   location.hash = `#/m/${n.id}`;
   setTimeout(() => openDetails(n, true), 50);
   if (last) toast(`First session pre-filled from ${label(m, last)}`);
+}
+
+// ---------- Voice notes ----------
+// Speech-to-text where the browser offers it (Safari's webkitSpeechRecognition). The iPhone
+// keyboard's own dictation (mic key) also works in any text box.
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let activeRec = null;
+
+function dictate(textarea, onText) {
+  const btn = document.getElementById('dictate');
+  if (activeRec) { activeRec.stop(); return; }
+  const rec = new SpeechRec();
+  rec.lang = navigator.language || 'en-GB';
+  rec.continuous = true;
+  rec.interimResults = true;
+  const start = textarea.value.trim();
+  let finalText = '';
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) finalText += r[0].transcript.trim() + ' '; else interim += r[0].transcript;
+    }
+    textarea.value = [start, (finalText + interim).trim()].filter(Boolean).join(start ? '\n' : '');
+    onText(textarea.value);
+  };
+  rec.onerror = (e) => {
+    toast(e.error === 'not-allowed' ? 'Microphone not allowed – use the keyboard mic instead' : 'Dictation stopped');
+  };
+  rec.onend = () => { activeRec = null; btn.classList.remove('on'); btn.textContent = '🎤 Dictate'; };
+  try {
+    rec.start();
+    activeRec = rec;
+    btn.classList.add('on'); btn.textContent = '■ Stop';
+  } catch {
+    toast('Dictation not available – use the keyboard mic instead');
+  }
 }
 
 // ---------- Misc ----------

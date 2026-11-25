@@ -312,3 +312,10 @@ input,select,textarea{font-size:16px !important}
 .prow.axle-row{grid-template-columns:minmax(0,1fr) 113px 113px}
 .prow.axle-row .cell.span2.gap{margin-right:6px}
 @media (max-width:370px){.prow.axle-row{grid-template-columns:minmax(0,1fr) 101px 101px}}
+
+/* Voice notes */
+.notes-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.notes-head h3{margin:0}
+.dictate{color:var(--acc);border-color:rgba(52,211,153,.5)}
+.dictate.on{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.6}}

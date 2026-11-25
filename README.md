@@ -12,7 +12,7 @@ full screen and works offline at the track.
 - **Session info** at the top of each session: tyre (carries forward), a short comment, lap time and ref time. All show in the Grid.
 - **Setup**: only the adjustable Front/Rear cells from the spreadsheet (greyed-out cells are left out).
   Camber is a number plus POS/NEG, toe a number plus IN/OUT, steering yoke LONG (= hard) / SHORT (= soft),
-  stub pos 1–5, wheelbase S/M/L, 3rd IN/OUT (rear), front bar OUT/NYLON/STEEL, pinion 10–14. Caster is entered as top (−4…+4) and bottom (FWD/BACK) positions and the degrees are calculated.
+  stub pos 1–5, wheelbase S/M/L, 3rd IN/OUT (rear), front bar OUT/NYLON/STEEL, pinion 10–14, ride height LOW/STD/HIGH. Caster is entered as top (−4…+4) and bottom (FWD/BACK) positions and the degrees are calculated.
 - **Changes**: each session shows what changed from the previous one, and the *Grid* view shows every
   session side by side with changed cells highlighted.
 - **Only enter what changes**: each session stores just the values you change. Blank boxes carry the
@@ -27,6 +27,8 @@ full screen and works offline at the track.
   Tap *Cold set ›* (or *Adjust pressures & rim temp*) for a pop-up: set a new rim temp for all tyres or each tyre
   with or without temp compensation (psi per °C), nudge front and/or rear by 0.1 psi, preview, apply.
   Adjusted boxes get an amber dot; *Revert adjustment* puts them back. Hot pressure boxes are red.
+- **Voice notes**: *Dictate* on a session's Notes types what you say, where the browser supports speech
+  recognition; the iPhone keyboard's mic key works in any box anyway.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.
