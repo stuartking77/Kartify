@@ -319,3 +319,18 @@ input,select,textarea{font-size:16px !important}
 .dictate{color:var(--acc);border-color:rgba(52,211,153,.5)}
 .dictate.on{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse 1.2s infinite}
 @keyframes pulse{50%{opacity:.6}}
+
+/* Fuel */
+.fuel-sum{padding:8px 12px}
+.fuel-line{display:grid;grid-template-columns:minmax(0,1fr) 92px 64px;gap:8px;align-items:center;padding:4px 0}
+.fuel-line input,.fuel-row input{height:36px;text-align:center;font-weight:600;padding:0 4px;width:100%}
+.fuel-l{font-weight:600;color:var(--acc);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.fuel-used{text-align:right;padding-top:4px;border-top:1px solid #22262d;margin-top:4px}
+.fuel-used b{color:var(--text)}
+.fuel-row{display:grid;grid-template-columns:minmax(0,1fr) 92px 64px;gap:8px;align-items:center;min-height:42px;border-top:1px solid #22262d;padding:3px 0}
+.card.fuel h3 + .fuel-row{border-top:0}
+.fuel-out{text-align:center;font-weight:650;font-variant-numeric:tabular-nums;font-size:17px}
+.fuel-row .unit{font-size:13px}
+.card.fuel.main{border-color:rgba(52,211,153,.45)}
+.card.fuel.main [data-out=fillMm]{color:var(--acc);font-size:22px}
+textarea[name=table]{font-variant-numeric:tabular-nums}

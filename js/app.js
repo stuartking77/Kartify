@@ -1,6 +1,7 @@
 import { FIELDS, TIMES, CASTER_TOP, CASTER_BOTTOM, casterDegrees, signed } from './schema.js';
 import * as store from './store.js';
 import * as P from './pressure.js';
+import * as F from './fuel.js';
 
 const state = store.load();
 const $app = document.getElementById('app');
@@ -45,7 +46,7 @@ window.addEventListener('hashchange', () => {
 });
 
 function openSession(m, sid) {
-  ui.view = ui.view === 'pressure' ? 'pressure' : 'session'; // stay on the pressure page when switching session
+  ui.view = ['pressure', 'fuel'].includes(ui.view) ? ui.view : 'session'; // stay on the pressure / fuel page when switching session
   ui.session = sid;
   const h = `#/m/${m.id}/${sid}`;
   if (location.hash === h) renderMeeting(m); else location.hash = h;
@@ -174,6 +175,7 @@ function renderMeeting(m) {
 
   if (ui.view === 'grid') return renderGrid(m);
   if (ui.view === 'pressure') return renderPressure(m, sess);
+  if (ui.view === 'fuel') return renderFuel(m, sess);
   renderSessionForm(m, sess);
 }
 
@@ -328,6 +330,7 @@ function renderSessionForm(m, s) {
             placeholder="${esc((t.carry && store.carriedInfo(m, s, t)) || t.placeholder || '–')}"
             class="${t.carry && store.carriedInfo(m, s, t) ? 'carried' : ''}"></label>`).join('')}
     </div>
+    ${fuelSummaryHTML(m, s)}
     <div class="row">
       <button id="saveSetup" style="flex:1">Save setup</button>
       <button id="loadSetup" style="flex:1">Load setup</button>
@@ -418,6 +421,8 @@ function renderSessionForm(m, s) {
   }));
 
   $app.querySelectorAll('[data-goto=pressure]').forEach((b) => b.onclick = () => { ui.view = 'pressure'; renderMeeting(m); window.scrollTo(0, 0); });
+  $app.querySelectorAll('[data-goto=fuel]').forEach((b) => b.onclick = () => { ui.view = 'fuel'; renderMeeting(m); window.scrollTo(0, 0); });
+  bindFuelInputs(m, s);
   document.getElementById('saveSetup').onclick = () => saveSetupSheet(m, s);
   document.getElementById('loadSetup').onclick = () => loadSetupSheet(m, s);
 
@@ -938,6 +943,7 @@ function openMenu(m, sess) {
     <div class="sheet-body">
       <button data-a="details">Edit event details</button>
       <button data-a="pressure">Pressure settings</button>
+      <button data-a="fuel">Fuel settings</button>
       ${ui.view === 'session' ? `<button data-a="clearSession">Clear session "${esc(label(m, sess))}"</button>` : ''}
       <button data-a="clearAll">Clear all sessions</button>
       ${canDelete ? `<button data-a="delSession" class="danger">Delete session "${esc(label(m, sess))}"</button>` : ''}
@@ -950,11 +956,13 @@ function openMenu(m, sess) {
     d.close();
     if (a === 'details') openDetails(m);
     if (a === 'pressure') openPressureSettings(m);
+    if (a === 'fuel') openFuelSettings(m);
     if (a === 'carry') carryForward(m);
     if (a === 'clearSession' && confirm(`Clear "${label(m, sess)}"? Its changes, times and notes are removed, so it goes back to the setup carried from before. The tab and its name stay.`)) {
       sess.values = {};
       sess.notes = '';
       sess.tyres = [];
+      sess.fuel = {};
       touch(m);
       renderMeeting(m);
       toast('Session cleared');
@@ -1043,6 +1051,145 @@ function carryForward(m) {
   location.hash = `#/m/${n.id}`;
   setTimeout(() => openDetails(n, true), 50);
   if (last) toast(`First session pre-filled from ${label(m, last)}`);
+}
+
+// ---------- Fuel ----------
+const fmtL = (v) => (v == null || !isFinite(v) ? '–' : v.toFixed(1));
+
+// Fuel start / end on the Setup page; tapping a name opens the fuel page.
+function fuelSummaryHTML(m, s) {
+  const f = s.fuel || {};
+  const c = F.fuelCalc(m, s);
+  return `
+    <div class="card fuel-sum">
+      ${[['start', 'Fuel start', c.startL], ['end', 'Fuel end', c.endL]].map(([k, name, l]) => `
+        <div class="fuel-line">
+          <button class="flabel ref" data-goto="fuel">${name} <span class="go">›</span></button>
+          <input data-fuel="${k}" value="${esc(f[k] ?? '')}" inputmode="decimal" placeholder="mm" autocomplete="off" aria-label="${name} mm">
+          <span class="fuel-l" data-fuel-l="${k}">${fmtL(l)} L</span>
+        </div>`).join('')}
+      <div class="fuel-used mute">Used <b data-fuel-used>${fmtL(c.used)}</b> L</div>
+    </div>`;
+}
+
+function bindFuelInputs(m, s, after) {
+  $app.querySelectorAll('input[data-fuel]').forEach((el) => {
+    el.addEventListener('input', () => {
+      s.fuel = { ...(s.fuel || {}), [el.dataset.fuel]: el.value.trim() };
+      touch(m); markChip(m, s);
+      const c = F.fuelCalc(m, s);
+      $app.querySelectorAll('[data-fuel-l=start]').forEach((x) => { x.textContent = `${fmtL(c.startL)} L`; });
+      $app.querySelectorAll('[data-fuel-l=end]').forEach((x) => { x.textContent = `${fmtL(c.endL)} L`; });
+      $app.querySelectorAll('[data-fuel-used]').forEach((x) => { x.textContent = fmtL(c.used); });
+      if (after) after(c);
+    });
+    el.addEventListener('focus', () => el.select());
+  });
+}
+
+function renderFuel(m, s) {
+  const f = s.fuel || {};
+  const row = (label, inner, hint = '') => `<div class="fuel-row"><div class="flabel">${label}${hint ? `<div class="hint">${hint}</div>` : ''}</div>${inner}</div>`;
+  const input = (k, ph, aria) => `<input data-fuel="${k}" value="${esc(f[k] ?? '')}" inputmode="decimal" placeholder="${ph}" autocomplete="off" aria-label="${aria}">`;
+  const out = (k, unit = '') => `<div class="fuel-out" data-out="${k}"></div><span class="unit">${unit}</span>`;
+
+  $app.innerHTML = `
+    <div class="ptop">
+      <button class="sm" id="toSetup">‹ Setup</button>
+      <div class="ptitle">Fuel · ${esc(label(m, s))}</div>
+    </div>
+    <div class="card fuel">
+      <h3>Tank (dipstick)</h3>
+      ${row('Start', `${input('start', 'mm', 'Fuel start mm')}<span class="fuel-l" data-fuel-l="start"></span>`)}
+      ${row('End', `${input('end', 'mm', 'Fuel end mm')}<span class="fuel-l" data-fuel-l="end"></span>`)}
+      ${row('<b>Used</b>', out('used', 'L'))}
+    </div>
+    <div class="card fuel">
+      <h3>Consumption</h3>
+      ${row('Session mins', input('mins', 'mins', 'Session minutes'))}
+      ${row('Used / min', out('perMin', 'L'))}
+      ${row('Next session mins', input('nextMins', 'mins', 'Next session minutes'))}
+      ${row('Fuel needed to add', out('needed', 'L'))}
+      ${row('Total needed', out('totalNeeded', 'L'), 'in tank at the start')}
+    </div>
+    <div class="card fuel">
+      <h3>Weight</h3>
+      ${row('Weight at end of session', input('endWeight', 'kg', 'Weight at end of session'))}
+      ${row('Delta', out('delta', 'kg'), 'vs min weight + margin')}
+      ${row('Fuel req for weight', out('forWeight', 'L'))}
+      ${row('<b>Uplift</b>', out('uplift', 'L'), 'fuel needed + fuel for weight')}
+      ${row('Total in tank', out('upliftTotal', 'L'))}
+    </div>
+    <div class="card fuel main">
+      <h3>Fill to</h3>
+      ${row('Litres to add', input('add', '', 'Litres to add'), 'blank = uplift')}
+      ${row('In tank', out('inTank', 'L'))}
+      ${row('<b>Dipstick</b>', out('fillMm', 'mm'))}
+    </div>
+    <div class="card fuel">
+      <h3>Convert</h3>
+      ${row('mm → litres', `<input id="cvMm" inputmode="decimal" placeholder="mm" autocomplete="off"><span class="fuel-l" id="cvL"></span>`)}
+      ${row('litres → mm', `<input id="cvL2" inputmode="decimal" placeholder="L" autocomplete="off"><span class="fuel-l" id="cvMm2"></span>`)}
+    </div>
+    <div class="mute">Tank table, min weight, margin and fuel density are in ••• → Fuel settings.</div>`;
+
+  const show = (c) => {
+    const set = (k, v) => { const el = $app.querySelector(`[data-out="${k}"]`); if (el) el.textContent = v; };
+    $app.querySelectorAll('[data-fuel-l=start]').forEach((x) => { x.textContent = `${fmtL(c.startL)} L`; });
+    $app.querySelectorAll('[data-fuel-l=end]').forEach((x) => { x.textContent = `${fmtL(c.endL)} L`; });
+    set('used', fmtL(c.used));
+    set('perMin', c.perMin == null ? '–' : c.perMin.toFixed(2));
+    set('needed', fmtL(c.needed));
+    set('totalNeeded', fmtL(c.totalNeeded));
+    set('delta', c.delta == null ? '–' : (c.delta > 0 ? '+' : '') + c.delta.toFixed(1));
+    set('forWeight', fmtL(c.forWeight));
+    set('uplift', fmtL(c.uplift));
+    set('upliftTotal', fmtL(c.upliftTotal));
+    set('inTank', fmtL(c.inTank));
+    set('fillMm', c.fillMm == null ? '–' : Math.round(c.fillMm));
+    const addIn = $app.querySelector('input[data-fuel=add]');
+    addIn.placeholder = c.uplift == null ? 'L' : c.uplift.toFixed(1);
+  };
+  show(F.fuelCalc(m, s));
+  bindFuelInputs(m, s, show);
+
+  const st = F.fuelSettings(m);
+  const cv = (inp, outEl, fn, unit, d) => inp.addEventListener('input', () => {
+    const v = fn(inp.value.trim(), st.table);
+    outEl.textContent = v == null ? '' : `${v.toFixed(d)} ${unit}`;
+  });
+  cv(document.getElementById('cvMm'), document.getElementById('cvL'), F.litresFromMm, 'L', 1);
+  cv(document.getElementById('cvL2'), document.getElementById('cvMm2'), F.mmFromLitres, 'mm', 0);
+  document.getElementById('toSetup').onclick = () => { ui.view = 'session'; renderMeeting(m); window.scrollTo(0, 0); };
+}
+
+function openFuelSettings(m) {
+  const st = F.fuelSettings(m);
+  const d = sheet(`
+    <form method="dialog" class="sheet-body">
+      <h3>Fuel settings (this event)</h3>
+      <label class="field">Min weight (kg)<input name="minWeight" value="${esc(st.minWeight)}" inputmode="decimal"></label>
+      <label class="field">Margin (kg above min weight)<input name="margin" value="${esc(st.margin)}" inputmode="decimal"></label>
+      <label class="field">Fuel density (kg per litre)<input name="density" value="${esc(st.density)}" inputmode="decimal"></label>
+      <label class="field">Tank table – dipstick mm = litres, one per line
+        <textarea name="table" rows="9">${esc(st.table.map(([a, b]) => `${a} = ${b}`).join('\n'))}</textarea></label>
+      <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
+    </form>`);
+  d.querySelector('form').addEventListener('submit', () => {
+    const fd = new FormData(d.querySelector('form'));
+    const fuel = {};
+    for (const k of ['minWeight', 'margin', 'density']) {
+      const v = String(fd.get(k)).trim();
+      if (v !== '' && !isNaN(Number(v))) fuel[k] = Number(v);
+    }
+    const table = String(fd.get('table')).split('\n')
+      .map((l) => l.split(/[=,:\s]+/).filter(Boolean).map(Number))
+      .filter((p) => p.length === 2 && p.every((x) => isFinite(x)));
+    if (table.length >= 2) fuel.table = table; else toast('Tank table needs at least 2 lines – kept the old one');
+    m.fuel = fuel;
+    touch(m);
+    renderMeeting(m);
+  });
 }
 
 // ---------- Voice notes ----------

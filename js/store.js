@@ -1,5 +1,6 @@
 import { LEGACY_SESSIONS, FIELDS, TIMES, casterDegrees, signed } from './schema.js';
 import { tyreHasData, upgradeTyre } from './pressure.js';
+import { fuelHasData } from './fuel.js';
 
 const KEY = 'kartify.v1';
 
@@ -96,6 +97,7 @@ export function hasSetup(session) {
 export function sessionHasData(session) {
   if (!session) return false;
   if ((session.tyres || []).some(tyreHasData)) return true;
+  if (fuelHasData(session.fuel)) return true;
   if (session.notes && session.notes.trim()) return true;
   if (TIMES.some((t) => getVal(session, t))) return true;
   return FIELDS.some((f) => f.sides.some((side) => display(session, f, side)));
