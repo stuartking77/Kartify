@@ -523,6 +523,7 @@ function renderPressure(m, s) {
     { id: 'corrCold', label: 'Corr cold', f: (c) => fmt(c.corrCold), main: true },
   ];
   const HINT = { hot: 'came in at', target: 'grey = Setup' };
+  const FILL_ALL = ['rimT', 'cold'];
 
   $app.innerHTML = `
     <div class="ptop">
@@ -542,7 +543,8 @@ function renderPressure(m, s) {
       <div class="prow psub"><span></span>${P.CORNERS.map((c) => `<span>${c.label}</span>`).join('')}</div>
       ${P.P_INPUTS.map((p) => `
         <div class="prow">
-          <div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}</div>
+          <div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}
+            ${FILL_ALL.includes(p.id) ? `<button class="fill-all" data-fill="${p.id}">Copy to all</button>` : ''}</div>
           ${P.CORNERS.map((c) => `
             <div class="cell ${c.id === 'rf' ? 'gap' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
               placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, c.id) : '')}" inputmode="decimal" autocomplete="off"
@@ -586,11 +588,30 @@ function renderPressure(m, s) {
   $app.querySelectorAll('input[data-p]').forEach((el) => {
     el.addEventListener('input', () => {
       t[el.dataset.side] = { ...(t[el.dataset.side] || {}), [el.dataset.p]: el.value.trim() };
+      ui.lastCorner = { [el.dataset.p]: el.dataset.side, ...(ui.lastCorner || {}), [el.dataset.p]: el.dataset.side };
       touch(m); markChip(m, s); updateCalc();
       $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
     });
     el.addEventListener('focus', () => el.select());
   });
+  // "Copy to all": the value last typed in that row (or the first one filled) goes to all four tyres.
+  $app.querySelectorAll('[data-fill]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => e.preventDefault()); // keep the keyboard up
+    b.onclick = () => {
+      const id = b.dataset.fill;
+      const from = ui.lastCorner?.[id] && t[ui.lastCorner[id]]?.[id] ? ui.lastCorner[id]
+        : P.CORNERS.map((c) => c.id).find((c) => (t[c]?.[id] ?? '') !== '');
+      if (!from) { toast('Type a value first'); return; }
+      const v = t[from][id];
+      for (const c of P.CORNERS) {
+        t[c.id] = { ...(t[c.id] || {}), [id]: v };
+        $app.querySelector(`input[data-p="${id}"][data-side="${c.id}"]`).value = v;
+      }
+      touch(m); markChip(m, s); updateCalc();
+      $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
+    };
+  });
+
   // Copy / paste cold pressures between tyres and sessions (kept while the app is open).
   const pasteBtn = document.getElementById('pastePress');
   const showPaste = () => {
