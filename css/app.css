@@ -379,3 +379,12 @@ textarea[name=table]{font-variant-numeric:tabular-nums}
 .frow.wide-in{grid-template-columns:96px minmax(0,1fr)}
 .frow.wide-in .cell.span2{grid-column:auto}
 .frow.wide-in input{text-align:left;padding:0 10px}
+
+/* Green double chevron on tappable labels */
+.chev{width:15px;height:11px;color:var(--acc);vertical-align:0;margin-left:3px;flex:none}
+button.link{cursor:pointer}
+button.fuel-top{display:flex;align-items:center;gap:4px;background:none;border:0;padding:0;margin:0 0 4px;color:inherit}
+button.fuel-top h3{margin:0}
+button.fuel-top .chev{width:16px;height:12px}
+button.flabel.link{font-weight:400}
+.nowrap .nowrap{white-space:nowrap}

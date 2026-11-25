@@ -195,6 +195,9 @@ function inputHTML(field, side, value, inherited = '') {
 const segClass = (v, current, inherited) => (v === current ? 'act' : !current && v === inherited ? 'inh' : '');
 
 // Buttons where tapping the selected one again clears it (back to the carried value).
+// Green double chevron: "tap for more" on Target hot pressure and Fuel.
+const CHEV = '<svg class="chev" viewBox="0 0 16 12" aria-hidden="true"><path d="M2 1.5 6.5 6 2 10.5M8.5 1.5 13 6l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 // Options with a `note` (steering yoke) show the note for the picked option beside the buttons.
 const noteFor = (options, v) => options.find((o) => typeof o === 'object' && o.v === v)?.note || '';
 function segHTML(fieldId, key, options, current, inherited = '') {
@@ -218,7 +221,9 @@ function selectHTML(fieldId, key, options, current, aria, inherited = '') {
 function labelHTML(f) {
   const inner = `${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}${f.ref ? ' <span class="info">i</span>' : ''}
     ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}`;
-  if (f.link) return `<button class="flabel ref" data-goto="${f.link}">${inner}<span class="open-chip">${f.link === 'pressure' ? 'Pressures' : 'Open'} ›</span></button>`;
+  if (f.link) {
+    return `<button class="flabel ref link" data-goto="${f.link}" aria-label="${esc(f.label)} – open tyre pressures"><span class="nowrap">${esc(f.label).replace(/ (\S+)$/, ' <span class="nowrap">$1')}${CHEV}</span></span>${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}</button>`;
+  }
   return f.ref
     ? `<button class="flabel ref" data-ref="${f.ref}" aria-label="${esc(f.label)} reference">${inner}</button>`
     : `<div class="flabel">${inner}</div>`;
@@ -1078,7 +1083,7 @@ function fuelSummaryHTML(m, s) {
   const c = F.fuelCalc(m, s);
   return `
     <div class="card fuel-sum">
-      <div class="fuel-top"><h3>Fuel</h3><button class="open-chip btn" data-goto="fuel">Fuel page ›</button></div>
+      <button class="fuel-top link" data-goto="fuel" aria-label="Open fuel page"><h3>Fuel</h3>${CHEV}</button>
       ${[['start', 'Fuel start', c.startL], ['end', 'Fuel end', c.endL]].map(([k, name, l]) => `
         <div class="fuel-line">
           <button class="flabel ref" data-goto="fuel">${name}</button>
