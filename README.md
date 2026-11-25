@@ -18,7 +18,7 @@ full screen and works offline at the track.
 - **Only enter what changes**: each session stores just the values you change. Blank boxes carry the
   value from the closest earlier session (left blank on screen). *Save setup* saves the full setup in force at
   that session, pulling every carried value through.
-- **Tyre pressures**: tap *Target hot pressure* in a session to open its pressure page. One tab per tyre run
+- **Tyre pressures**: tap *Target hot* in a session to open its pressure page. One tab per tyre run
   that session (+ Tyre to add more), four corners (Front L/R, Rear L/R): Rim T (green), Cold set (blue), Hot pressure (red, what they came in at) and
   a front/rear New target in (Corr uses New target, or the Setup's target when blank; the Setup target is shown too); Ref @ ref temp, Rise coeff, Corr delta and Corr cold out.
   PSI per °C, ref temperature and the generic ref rise are set once per event (••• → Pressure settings).
