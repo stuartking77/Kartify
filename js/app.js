@@ -195,12 +195,14 @@ function inputHTML(field, side, value, inherited = '') {
 const segClass = (v, current, inherited) => (v === current ? 'act' : !current && v === inherited ? 'inh' : '');
 
 // Buttons where tapping the selected one again clears it (back to the carried value).
+// Options with a `note` (steering yoke) show the note for the picked option beside the buttons.
+const noteFor = (options, v) => options.find((o) => typeof o === 'object' && o.v === v)?.note || '';
 function segHTML(fieldId, key, options, current, inherited = '') {
+  const notes = options.some((o) => typeof o === 'object' && o.note);
   return `<div class="seg" data-choice="${fieldId}:${key}" data-inh="${esc(inherited)}">${options.map((o) => {
     const v = typeof o === 'string' ? o : o.v;
-    const txt = typeof o === 'string' ? o : `${o.v}<small>= ${o.note}</small>`;
-    return `<button data-v="${v}" class="${segClass(v, current, inherited)}">${txt}</button>`;
-  }).join('')}</div>`;
+    return `<button data-v="${v}" class="${segClass(v, current, inherited)}">${v}</button>`;
+  }).join('')}</div>${notes ? `<span class="seg-note" data-note="${fieldId}:${key}">${esc(noteFor(options, current))}</span>` : ''}`;
 }
 
 const optText = (o) => (typeof o === 'number' || /^-?\d+$/.test(o) && Number(o) < 0 ? signed(o) : String(o));
@@ -216,7 +218,7 @@ function selectHTML(fieldId, key, options, current, aria, inherited = '') {
 function labelHTML(f) {
   const inner = `${esc(f.label)}${f.unit ? ` <span class="unit">${esc(f.unit)}</span>` : ''}${f.ref ? ' <span class="info">i</span>' : ''}
     ${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ''}`;
-  if (f.link) return `<button class="flabel ref" data-goto="${f.link}">${inner} <span class="go">›</span></button>`;
+  if (f.link) return `<button class="flabel ref" data-goto="${f.link}">${inner}<span class="open-chip">${f.link === 'pressure' ? 'Pressures' : 'Open'} ›</span></button>`;
   return f.ref
     ? `<button class="flabel ref" data-ref="${f.ref}" aria-label="${esc(f.label)} reference">${inner}</button>`
     : `<div class="flabel">${inner}</div>`;
@@ -277,8 +279,8 @@ function rowHTML(f, s, inh) {
       <div class="frow wide">
         ${labelHTML(f)}
         <div class="wide-ctl">
-          <div class="lbl-ctl"><span>Top</span>${selectHTML('caster', 'top', CASTER_TOP, o('top'), 'Caster top position', i('top'))}</div>
-          <div class="lbl-ctl"><span>Bottom</span>${segHTML('caster', 'bottom', CASTER_BOTTOM, o('bottom'), i('bottom'))}</div>
+          ${segHTML('caster', 'bottom', CASTER_BOTTOM, o('bottom'), i('bottom'))}
+          ${selectHTML('caster', 'top', CASTER_TOP, o('top'), 'Caster top position', i('top'))}
           <div class="caster-out" id="casterOut"></div>
         </div>
       </div>`;
@@ -304,6 +306,10 @@ function rowHTML(f, s, inh) {
           ? `<div class="cell">${selectHTML(f.id, side, f.options, o(side), f.label, i(side))}</div>`
           : '<div class="cell na"></div>').join('')}
       </div>`;
+  }
+  if (f.wideInput) {
+    const side = f.sides[0];
+    return `<div class="frow wide-in">${labelHTML(f)}${inputHTML(f, side, o(side), i(side)).replace('class="cell"', 'class="cell span2"')}</div>`;
   }
   return `
     <div class="frow">
@@ -444,6 +450,11 @@ function renderSessionForm(m, s) {
 function paintSeg(seg, current) {
   const inh = seg.dataset.inh;
   seg.querySelectorAll('button').forEach((x) => { x.className = segClass(x.dataset.v, current, inh); });
+  const note = document.querySelector(`[data-note="${seg.dataset.choice}"]`);
+  if (note) {
+    const f = FIELDS.find((x) => x.id === seg.dataset.choice.split(':')[0]);
+    note.textContent = noteFor(f?.options || [], current);
+  }
 }
 
 function markChip(m, s) {
@@ -1067,9 +1078,10 @@ function fuelSummaryHTML(m, s) {
   const c = F.fuelCalc(m, s);
   return `
     <div class="card fuel-sum">
+      <div class="fuel-top"><h3>Fuel</h3><button class="open-chip btn" data-goto="fuel">Fuel page ›</button></div>
       ${[['start', 'Fuel start', c.startL], ['end', 'Fuel end', c.endL]].map(([k, name, l]) => `
         <div class="fuel-line">
-          <button class="flabel ref" data-goto="fuel">${name} <span class="go">›</span></button>
+          <button class="flabel ref" data-goto="fuel">${name}</button>
           <input data-fuel="${k}" value="${esc(f[k] ?? '')}" inputmode="decimal" placeholder="mm" autocomplete="off" aria-label="${name} mm">
           <span class="fuel-l" data-fuel-l="${k}">${fmtL(l)} L</span>
         </div>`).join('')}

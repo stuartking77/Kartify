@@ -365,3 +365,17 @@ textarea[name=table]{font-variant-numeric:tabular-nums}
   .form-head,.frow{grid-template-columns:minmax(0,1fr) 66px 66px;gap:8px}
   .wide-ctl .seg button{padding:5px 5px;min-width:36px}
 }
+
+/* Links to the pressure / fuel pages */
+.open-chip{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.02em;
+  color:#06130d;background:var(--acc);vertical-align:1px;white-space:nowrap}
+.open-chip.btn{border:0;margin:0;padding:5px 10px;font-size:12px}
+.fuel-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.fuel-top h3{margin:0}
+.fuel-line .flabel.ref{color:var(--text);font-size:14px}
+/* Steering yoke note, seat height wide box */
+.seg-note{min-width:44px;font-size:12px;font-weight:700;color:var(--acc);letter-spacing:.04em}
+.cell.span2{grid-column:span 2}
+.frow.wide-in{grid-template-columns:96px minmax(0,1fr)}
+.frow.wide-in .cell.span2{grid-column:auto}
+.frow.wide-in input{text-align:left;padding:0 10px}
