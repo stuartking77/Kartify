@@ -89,3 +89,17 @@ export function initialTyres(m, s, sessionTyreName) {
   }
   return [newTyre(sessionTyreName || '')];
 }
+
+// Tidy number for display/storage: at most 2 decimals, no trailing zeros.
+export const tidy = (n) => String(Number(Number(n).toFixed(2)));
+
+// A pasted cold pressure remembers the rim temp it was set at (`base`). When the rim temp
+// changes, the cold pressure follows it (psi per °C), like the sheet's "current cold press".
+export function retemp(m, corner) {
+  const b = corner.base;
+  if (!b) return false;
+  const now = num(corner.rimT), then = num(b.rimT), cold = num(b.cold);
+  if (now == null || then == null || cold == null) return false;
+  corner.cold = tidy(cold + (now - then) * settingsOf(m).psiPerDeg);
+  return true;
+}

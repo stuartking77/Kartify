@@ -23,6 +23,8 @@ full screen and works offline at the track.
   Target hot (defaults to the Setup's Target hot pressure) in; Ref @ ref temp, Rise coeff, Corr delta and Corr cold out.
   PSI per °C, ref temperature and the generic ref rise are set once per event (••• → Pressure settings).
   *Copy cold set* / *Copy corr cold* then *Paste* puts those pressures and their rim temps into another tyre or session.
+  Pasted cold sets follow the rim temp (0.1 psi/°C) when you change it, and *Adjust cold set* nudges
+  front and/or rear cold pressures by 0.1 psi per tap.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.
