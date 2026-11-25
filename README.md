@@ -32,8 +32,8 @@ full screen and works offline at the track.
   uplift, and the dipstick mm to fill to, plus a mm ↔ litres converter. The tank table (dipstick
   mm = litres) is edited at the bottom of the fuel page and shared by all events; min weight,
   margin and fuel density are per event in ••• → Fuel settings.
-- **Voice notes**: *Dictate* on a session's Notes types what you say, where the browser supports speech
-  recognition; the iPhone keyboard's mic key works in any box anyway.
+- **Voice notes**: the 🎤 by Notes opens the box for the iPhone keyboard's dictation (mic key), which
+  works in any box.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.

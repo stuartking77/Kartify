@@ -344,7 +344,7 @@ function renderSessionForm(m, s) {
     </div>
     <div class="card">
       <div class="notes-head"><h3>Notes</h3>
-        ${SpeechRec ? '<button type="button" id="dictate" class="sm dictate">🎤 Dictate</button>' : ''}</div>
+        <button type="button" id="dictate" class="sm dictate" aria-label="Dictate notes">🎤</button></div>
       <textarea id="notes" rows="5" placeholder="How did it feel? What changed?">${esc(s.notes)}</textarea>
     </div>`;
 
@@ -431,9 +431,13 @@ function renderSessionForm(m, s) {
   document.getElementById('notes').addEventListener('input', (e) => {
     s.notes = e.target.value; touch(m); markChip(m, s);
   });
-  document.getElementById('dictate')?.addEventListener('click', () => dictate(document.getElementById('notes'), (text) => {
-    s.notes = text; touch(m); markChip(m, s);
-  }));
+  // Voice notes use the iPhone keyboard's own dictation (reliable, no repeated mic prompts).
+  document.getElementById('dictate').addEventListener('click', () => {
+    const ta = document.getElementById('notes');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    toast('Tap the 🎤 on the keyboard to dictate');
+  });
 
 }
 
@@ -1235,61 +1239,6 @@ function openFuelSettings(m) {
     touch(m);
     renderMeeting(m);
   });
-}
-
-// ---------- Voice notes ----------
-// Speech-to-text where the browser offers it (Safari's webkitSpeechRecognition). The iPhone
-// keyboard's own dictation (mic key) also works in any text box.
-const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-// One recogniser, reused: iPhone Safari is unreliable when a fresh one is created for each go,
-// and reusing it means fewer microphone prompts.
-let recog = null;
-let listening = false;
-
-function dictate(textarea, onText) {
-  const btn = document.getElementById('dictate');
-  const setBtn = (on) => {
-    const b = document.getElementById('dictate');
-    if (!b) return;
-    b.classList.toggle('on', on);
-    b.textContent = on ? '■ Stop' : '🎤 Dictate';
-  };
-  if (!recog) {
-    recog = new SpeechRec();
-    recog.lang = navigator.language || 'en-GB';
-    recog.continuous = false;      // one phrase per go: the reliable mode on iPhone
-    recog.interimResults = true;
-  }
-  if (listening) { try { recog.stop(); } catch { /* already stopped */ } return; }
-
-  const start = textarea.value.replace(/\s+$/, '');
-  let heard = '';
-  recog.onresult = (e) => {
-    let text = '';
-    for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
-    heard = text.trim();
-    // the textarea may have been re-drawn since; write to the one on screen now
-    const ta = document.getElementById('notes') || textarea;
-    ta.value = start ? `${start}\n${heard}` : heard;
-    onText(ta.value);
-  };
-  recog.onerror = (e) => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Microphone not allowed – use the keyboard mic instead');
-    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast(`Dictation stopped (${e.error})`);
-  };
-  recog.onend = () => { listening = false; setBtn(false); };
-  const go = () => { recog.start(); listening = true; setBtn(true); };
-  try {
-    go();
-  } catch {
-    // still winding down from last time: reset and try again
-    try { recog.abort(); } catch { /* ignore */ }
-    recog = null;
-    setTimeout(() => {
-      try { dictate(textarea, onText); } catch { toast('Dictation not available – use the keyboard mic instead'); }
-    }, 250);
-  }
-  if (!btn) setBtn(listening);
 }
 
 // ---------- Misc ----------
