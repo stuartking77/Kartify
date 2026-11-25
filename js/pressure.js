@@ -12,7 +12,7 @@ export const P_INPUTS = [
   { id: 'rimT',   label: 'Rim T',        unit: '°C' },
   { id: 'cold',   label: 'Cold set',     unit: 'psi' },
   { id: 'hot',    label: 'Hot pressure', unit: 'psi' },
-  { id: 'target', label: 'Target hot',   unit: 'psi' },
+  { id: 'target', label: 'New target',   unit: 'psi' },
 ];
 
 // Four corners; `axle` links each to the Front/Rear target in the Setup.
@@ -41,6 +41,11 @@ export function tyreHasData(t) {
 function sameTyre(session, t, idx) {
   const list = session.tyres || [];
   return list.find((x, i) => key(x, i) === key(t, idx));
+}
+
+// The session's target hot pressure from the Setup (front or rear, as carried through sessions).
+export function setupTarget(m, s, corner) {
+  return effectiveValues(m, m.sessions.indexOf(s)).hotPressure?.[axleOf(corner)] ?? '';
 }
 
 // Target hot pressure when not typed for this tyre: the session's target from the Setup

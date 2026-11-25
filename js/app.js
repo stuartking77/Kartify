@@ -522,8 +522,8 @@ function renderPressure(m, s) {
     { id: 'corrDelta', label: 'Corr delta', f: (c) => fmtSigned(c.corrDelta) },
     { id: 'corrCold', label: 'Corr cold', f: (c) => fmt(c.corrCold), main: true },
   ];
-  const HINT = { hot: 'came in at', target: 'grey = Setup' };
-  const FILL_ALL = ['rimT'];
+  const HINT = { hot: 'came in at', target: 'Corr uses this; blank = Setup' };
+  const FILL_ALL = ['rimT', 'target'];
 
   $app.innerHTML = `
     <div class="ptop">
@@ -542,6 +542,11 @@ function renderPressure(m, s) {
       <div class="prow phead"><span></span><span class="axle">Front</span><span class="axle">Rear</span></div>
       <div class="prow psub"><span></span>${P.CORNERS.map((c) => `<span>${c.label}</span>`).join('')}</div>
       ${P.P_INPUTS.map((p) => `
+        ${p.id === 'target' ? `
+        <div class="prow setup-target">
+          <div class="flabel">Setup target<div class="hint">from Setup sheet</div></div>
+          ${P.CORNERS.map((c) => `<div class="cell out ${c.id === 'rf' ? 'gap' : ''}">${esc(P.setupTarget(m, s, c.id) || '–')}</div>`).join('')}
+        </div>` : ''}
         <div class="prow">
           ${p.id === 'cold'
             ? `<button class="flabel ref" data-adjust>${p.label} <span class="go">›</span><div class="hint">tap to adjust</div></button>`
@@ -679,7 +684,7 @@ function sendClipSheet(m) {
         Cold ${P.CORNERS.map((c) => esc(v[c.id].cold || '–')).join(' / ')}
         ${P.CORNERS.some((c) => v[c.id].rimT) ? ` · rim T ${P.CORNERS.map((c) => esc(v[c.id].rimT || '–')).join(' / ')}` : ''}</div>
       <label class="field">New tyre name<input id="clipName" value="${esc(clip.name)}" placeholder="e.g. Set 2 (scrubbed)" autocapitalize="words"></label>
-      <div class="mute">Send to a new tyre in:</div>
+      <div class="mute">Send to (goes into that tyre if the session already has it, otherwise a new tyre):</div>
       <div class="send-list">
         ${m.sessions.map((x) => `<button data-send="${x.id}" class="${x.id === ui.session ? 'here' : ''}">${esc(label(m, x))}</button>`).join('')}
       </div>
@@ -688,15 +693,18 @@ function sendClipSheet(m) {
   d.querySelector('[data-a=keep]').onclick = () => { d.close(); toast('In the clipboard: tap Paste on any tyre'); };
   d.querySelectorAll('[data-send]').forEach((b) => b.onclick = () => {
     const target = m.sessions.find((x) => x.id === b.dataset.send);
-    const n = P.newTyre(d.querySelector('#clipName').value.trim());
+    const name = d.querySelector('#clipName').value.trim();
+    // Same tyre already in that session: copy the data into it rather than adding another.
+    let n = name && (target.tyres || []).find((x) => x.name.trim().toLowerCase() === name.toLowerCase());
+    const existed = !!n;
+    if (!n) { n = P.newTyre(name); target.tyres = [...(target.tyres || []), n]; }
     applyClip(n, clip);
-    target.tyres = [...(target.tyres || []), n];
     d.close();
     touch(m);
     ui.session = target.id; ui.tyre = n.id; ui.view = 'pressure';
     const h = `#/m/${m.id}/${target.id}`;
     if (location.hash === h) renderMeeting(m); else location.hash = h;
-    toast(`Sent to new tyre in ${label(m, target)}`);
+    toast(existed ? `Copied into ${n.name} in ${label(m, target)}` : `Sent to new tyre in ${label(m, target)}`);
   });
 }
 

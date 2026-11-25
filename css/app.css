@@ -285,3 +285,4 @@ input.small-in{width:90px;text-align:center}
 html{touch-action:manipulation}
 button,input,select,textarea,label{touch-action:manipulation}
 input,select,textarea{font-size:16px !important}
+.prow.setup-target .cell.out{color:var(--mute);font-weight:600}
