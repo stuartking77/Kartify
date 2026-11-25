@@ -719,7 +719,7 @@ function adjustSheet(m, s, t) {
 
   const d = sheet(`
     <form method="dialog" class="sheet-body adjust">
-      <h3>Adjust ${esc(t.name.trim() || 'tyre')} · ${esc(label(m, s))}</h3>
+      <h3>Adjust ${esc(t.name.trim() || `Tyre ${s.tyres.indexOf(t) + 1}`)} · ${esc(label(m, s))}</h3>
       <div class="adj-rim">
         <label class="field">New rim temp (all tyres, °C)
           <div class="stepper"><button type="button" data-rim="-1">−</button>
