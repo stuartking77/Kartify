@@ -522,6 +522,7 @@ function renderPressure(m, s) {
     { id: 'corrDelta', label: 'Corr delta', f: (c) => fmtSigned(c.corrDelta) },
     { id: 'corrCold', label: 'Corr cold', f: (c) => fmt(c.corrCold), main: true },
   ];
+  const HINT = { hot: 'came in at', target: 'grey = Setup' };
 
   $app.innerHTML = `
     <div class="ptop">
@@ -536,39 +537,35 @@ function renderPressure(m, s) {
       <label class="time info-field"><span>Tyre</span>
         <input id="tyreName" value="${esc(t.name)}" placeholder="e.g. Set 1 (new)" autocomplete="off" autocapitalize="words"></label>
     </div>
-    <div class="card form">
-      <div class="form-head"><span></span><span>Front</span><span>Rear</span></div>
+    <div class="card form pform">
+      <div class="prow phead"><span></span><span class="axle">Front</span><span class="axle">Rear</span></div>
+      <div class="prow psub"><span></span>${P.CORNERS.map((c) => `<span>${c.label}</span>`).join('')}</div>
       ${P.P_INPUTS.map((p) => `
-        <div class="frow">
-          <div class="flabel">${p.label} <span class="unit">${p.unit}</span>
-            ${p.id === 'target' ? '<div class="hint">grey = from Setup</div>' : p.id === 'hot' ? '<div class="hint">what they came in at</div>' : ''}</div>
-          ${['f', 'r'].map((side) => `
-            <div class="cell"><input data-p="${p.id}" data-side="${side}" value="${esc(t[side]?.[p.id] ?? '')}"
-              placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, side) : '')}" inputmode="decimal" autocomplete="off"></div>`).join('')}
+        <div class="prow">
+          <div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}</div>
+          ${P.CORNERS.map((c) => `
+            <div class="cell ${c.id === 'rf' ? 'gap' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
+              placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, c.id) : '')}" inputmode="decimal" autocomplete="off"
+              aria-label="${p.label} ${c.id.toUpperCase()}"></div>`).join('')}
         </div>`).join('')}
       <div class="calc-head">Calculated</div>
-      ${CALC.map((c) => `
-        <div class="frow calc ${c.main ? 'main' : ''}">
-          <div class="flabel">${c.label}</div>
-          ${['f', 'r'].map((side) => `<div class="cell out" data-calc="${c.id}" data-side="${side}"></div>`).join('')}
+      ${CALC.map((k) => `
+        <div class="prow calc ${k.main ? 'main' : ''}">
+          <div class="flabel">${k.label}</div>
+          ${P.CORNERS.map((c) => `<div class="cell out ${c.id === 'rf' ? 'gap' : ''}" data-calc="${k.id}" data-side="${c.id}"></div>`).join('')}
         </div>`).join('')}
     </div>
     <div class="row"><button id="delTyre" class="sm danger">Delete ${esc(tyreLabel(t))}</button></div>
-    <div class="card">
-      <h3>Pressure settings (this event)</h3>
-      <label>PSI per °C rim temp<input class="small-in" data-set="psiPerDeg" value="${esc(st.psiPerDeg)}" inputmode="decimal"></label>
-      <label>Ref temperature (°C)<input class="small-in" data-set="refTemp" value="${esc(st.refTemp)}" inputmode="decimal"></label>
-      <label>Ref rise (generic)<input class="small-in" data-set="refRise" value="${esc(st.refRise)}" inputmode="decimal"></label>
-      <div class="mute">Rise coeff compares this tyre's hot/cold rise with the generic ref rise (1.1 = 10%).</div>
-    </div>`;
+    <div class="mute">Pressure settings (ref temperature, PSI per °C, ref rise) are in the ••• menu.</div>`;
 
   const updateCalc = () => {
-    for (const side of ['f', 'r']) {
-      const c = P.calc(m, s, t, side);
-      for (const k of CALC) $app.querySelector(`[data-calc="${k.id}"][data-side="${side}"]`).textContent = k.f(c);
+    for (const c of P.CORNERS) {
+      const r = P.calc(m, s, t, c.id);
+      for (const k of CALC) $app.querySelector(`[data-calc="${k.id}"][data-side="${c.id}"]`).textContent = k.f(r);
     }
   };
   updateCalc();
+  ui.refreshPressure = updateCalc;
 
   document.getElementById('toSetup').onclick = () => { ui.view = 'session'; renderMeeting(m); window.scrollTo(0, 0); };
   $app.querySelectorAll('[data-t]').forEach((b) => b.onclick = () => { ui.tyre = b.dataset.t; renderPressure(m, s); });
@@ -589,20 +586,37 @@ function renderPressure(m, s) {
     });
     el.addEventListener('focus', () => el.select());
   });
-  $app.querySelectorAll('input[data-set]').forEach((el) => {
-    el.addEventListener('input', () => {
-      m.pressure = { ...(m.pressure || {}) };
-      if (el.value.trim() === '') delete m.pressure[el.dataset.set]; else m.pressure[el.dataset.set] = el.value.trim();
-      touch(m); updateCalc();
-      if (el.dataset.set === 'refTemp') $app.querySelector('.frow.calc .flabel').textContent = `Ref @ ${P.settingsOf(m).refTemp}°`;
-    });
-  });
   document.getElementById('delTyre').onclick = () => {
     if (!confirm(`Delete ${tyreLabel(t)} from this session?`)) return;
     s.tyres = s.tyres.filter((x) => x !== t);
     if (!s.tyres.length) s.tyres.push(P.newTyre());
     ui.tyre = null; touch(m); markChip(m, s); renderPressure(m, s);
   };
+}
+
+function openPressureSettings(m) {
+  const st = P.settingsOf(m);
+  const d = sheet(`
+    <form method="dialog" class="sheet-body">
+      <h3>Pressure settings (this event)</h3>
+      <label class="field">Ref temperature (°C) – pressures are compared at this rim temp
+        <input name="refTemp" value="${esc(st.refTemp)}" inputmode="decimal"></label>
+      <label class="field">PSI per °C rim temp
+        <input name="psiPerDeg" value="${esc(st.psiPerDeg)}" inputmode="decimal"></label>
+      <label class="field">Ref rise (generic) – Rise coeff compares each tyre's hot/cold rise with this (1.1 = 10%)
+        <input name="refRise" value="${esc(st.refRise)}" inputmode="decimal"></label>
+      <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
+    </form>`);
+  d.querySelector('form').addEventListener('submit', () => {
+    const fd = new FormData(d.querySelector('form'));
+    m.pressure = {};
+    for (const k of ['refTemp', 'psiPerDeg', 'refRise']) {
+      const v = String(fd.get(k)).trim();
+      if (v !== '' && !isNaN(Number(v))) m.pressure[k] = v;
+    }
+    touch(m);
+    renderMeeting(m);
+  });
 }
 
 // ---------- Sheets ----------
@@ -643,6 +657,7 @@ function openMenu(m, sess) {
   const d = sheet(`
     <div class="sheet-body">
       <button data-a="details">Edit event details</button>
+      <button data-a="pressure">Pressure settings</button>
       ${ui.view === 'session' ? `<button data-a="clearSession">Clear session "${esc(label(m, sess))}"</button>` : ''}
       <button data-a="clearAll">Clear all sessions</button>
       ${canDelete ? `<button data-a="delSession" class="danger">Delete session "${esc(label(m, sess))}"</button>` : ''}
@@ -654,6 +669,7 @@ function openMenu(m, sess) {
     const a = b.dataset.a;
     d.close();
     if (a === 'details') openDetails(m);
+    if (a === 'pressure') openPressureSettings(m);
     if (a === 'carry') carryForward(m);
     if (a === 'clearSession' && confirm(`Clear "${label(m, sess)}"? Its changes, times and notes are removed, so it goes back to the setup carried from before. The tab and its name stay.`)) {
       sess.values = {};

@@ -1,5 +1,5 @@
 import { LEGACY_SESSIONS, FIELDS, TIMES, casterDegrees, signed } from './schema.js';
-import { tyreHasData } from './pressure.js';
+import { tyreHasData, upgradeTyre } from './pressure.js';
 
 const KEY = 'kartify.v1';
 
@@ -196,6 +196,7 @@ function normalise(data) {
     }
     for (const s of m.sessions) {
       s.id ||= uid(); s.values ||= {}; s.name ??= ''; s.notes ??= ''; upgradeSession(s);
+      (s.tyres || []).forEach(upgradeTyre);
       if (s.inherited) { for (const f of FIELDS) delete s.values[f.id]; delete s.inherited; } // old automatic copies
       delete s.cleared;
     }

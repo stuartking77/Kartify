@@ -15,19 +15,26 @@ export const P_INPUTS = [
   { id: 'target', label: 'Target hot',   unit: 'psi' },
 ];
 
+// Four corners; `axle` links each to the Front/Rear target in the Setup.
+export const CORNERS = [
+  { id: 'lf', label: 'L', axle: 'f' }, { id: 'rf', label: 'R', axle: 'f' },
+  { id: 'lr', label: 'L', axle: 'r' }, { id: 'rr', label: 'R', axle: 'r' },
+];
+const axleOf = (corner) => CORNERS.find((c) => c.id === corner).axle;
+
 export function settingsOf(m) {
   return { ...PRESSURE_DEFAULTS, ...(m.pressure || {}) };
 }
 
 export function newTyre(name = '') {
-  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, f: {}, r: {} };
+  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, lf: {}, rf: {}, lr: {}, rr: {} };
 }
 
 const num = (v) => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
 const key = (t, i) => (t.name || '').trim().toLowerCase() || `#${i}`;
 
 export function tyreHasData(t) {
-  return ['f', 'r'].some((side) => P_INPUTS.some((p) => (t[side]?.[p.id] ?? '') !== ''));
+  return CORNERS.some((c) => P_INPUTS.some((p) => (t[c.id]?.[p.id] ?? '') !== ''));
 }
 
 // Same tyre (by name, or by position if unnamed) in an earlier session.
@@ -40,7 +47,7 @@ function sameTyre(session, t, idx) {
 // (Target hot pressure row, as carried through the sessions), else this tyre's target from
 // its closest earlier session that had a cold pressure set.
 export function carriedTarget(m, s, t, side) {
-  const setupTarget = effectiveValues(m, m.sessions.indexOf(s)).hotPressure?.[side];
+  const setupTarget = effectiveValues(m, m.sessions.indexOf(s)).hotPressure?.[axleOf(side)];
   if (setupTarget) return setupTarget;
   const idx = (s.tyres || []).indexOf(t);
   for (let i = m.sessions.indexOf(s) - 1; i >= 0; i--) {
@@ -50,7 +57,7 @@ export function carriedTarget(m, s, t, side) {
   return '';
 }
 
-// Calculated columns for one side of one tyre.
+// Calculated values for one corner (lf/rf/lr/rr) of one tyre.
 export function calc(m, s, t, side) {
   const st = settingsOf(m);
   const v = t[side] || {};
@@ -69,6 +76,12 @@ export function calc(m, s, t, side) {
 
 // When a session has no tyres yet, start with the previous session's tyres (names only),
 // or one tyre named after the session's tyre.
+// Earlier versions stored Front/Rear only; keep them as the left-hand corners.
+export function upgradeTyre(t) {
+  if (t.f || t.r) { t.lf ||= t.f || {}; t.lr ||= t.r || {}; delete t.f; delete t.r; }
+  for (const c of CORNERS) t[c.id] ||= {};
+}
+
 export function initialTyres(m, s, sessionTyreName) {
   for (let i = m.sessions.indexOf(s) - 1; i >= 0; i--) {
     const list = m.sessions[i].tyres || [];
