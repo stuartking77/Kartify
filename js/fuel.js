@@ -9,9 +9,18 @@ export const FUEL_DEFAULTS = {
   density: 0.75,    // kg per litre
 };
 
+// The tank table is shared by all events (kept in the app's saved data, set by the app).
+let tankTable = null;
+export function setTankTable(t) { tankTable = t; }
+export function cleanTable(t) {
+  return (t || []).map(([a, b]) => [Number(a), Number(b)])
+    .filter(([a, b]) => a !== '' && b !== '' && isFinite(a) && isFinite(b)).sort((x, y) => x[0] - y[0]);
+}
+
 export function fuelSettings(m) {
   const f = { ...FUEL_DEFAULTS, ...(m.fuel || {}) };
-  f.table = (Array.isArray(f.table) && f.table.length >= 2 ? f.table : FUEL_DEFAULTS.table)
+  const t = cleanTable(tankTable);
+  f.table = (t.length >= 2 ? t : FUEL_DEFAULTS.table)
     .map(([a, b]) => [Number(a), Number(b)]).filter(([a, b]) => isFinite(a) && isFinite(b)).sort((x, y) => x[0] - y[0]);
   for (const k of ['minWeight', 'margin', 'density']) f[k] = Number(f[k]);
   return f;

@@ -334,3 +334,10 @@ input,select,textarea{font-size:16px !important}
 .card.fuel.main{border-color:rgba(52,211,153,.45)}
 .card.fuel.main [data-out=fillMm]{color:var(--acc);font-size:22px}
 textarea[name=table]{font-variant-numeric:tabular-nums}
+
+/* Tank table */
+.tank-head,.tank-row{display:grid;grid-template-columns:1fr 1fr 40px;gap:8px;align-items:center}
+.tank-head{font-size:12px;color:var(--mute);font-weight:600;text-transform:uppercase;letter-spacing:.06em;text-align:center;padding-bottom:4px}
+.tank-row{padding:3px 0}
+.tank-row input{height:36px;text-align:center;font-weight:600;width:100%;padding:0 4px}
+.tank-row button{height:36px;padding:0;color:var(--mute)}

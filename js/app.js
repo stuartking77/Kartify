@@ -4,6 +4,7 @@ import * as P from './pressure.js';
 import * as F from './fuel.js';
 
 const state = store.load();
+F.setTankTable(state.tank);
 const $app = document.getElementById('app');
 const $hdr = document.getElementById('hdr');
 const $nav = document.getElementById('nav');
@@ -1131,7 +1132,16 @@ function renderFuel(m, s) {
       ${row('mm → litres', `<input id="cvMm" inputmode="decimal" placeholder="mm" autocomplete="off"><span class="fuel-l" id="cvL"></span>`)}
       ${row('litres → mm', `<input id="cvL2" inputmode="decimal" placeholder="L" autocomplete="off"><span class="fuel-l" id="cvMm2"></span>`)}
     </div>
-    <div class="mute">Tank table, min weight, margin and fuel density are in ••• → Fuel settings.</div>`;
+    <div class="card fuel tank">
+      <h3>Tank table <span class="mute">· all events</span></h3>
+      <div class="tank-head"><span>Dipstick mm</span><span>Litres</span><span></span></div>
+      <div id="tankRows"></div>
+      <div class="row">
+        <button id="addTankRow" style="flex:1">+ Add row</button>
+        <button id="resetTank" class="sm">Reset to default</button>
+      </div>
+    </div>
+    <div class="mute">Min weight, margin and fuel density are in ••• → Fuel settings.</div>`;
 
   const show = (c) => {
     const set = (k, v) => { const el = $app.querySelector(`[data-out="${k}"]`); if (el) el.textContent = v; };
@@ -1155,12 +1165,52 @@ function renderFuel(m, s) {
 
   const st = F.fuelSettings(m);
   const cv = (inp, outEl, fn, unit, d) => inp.addEventListener('input', () => {
-    const v = fn(inp.value.trim(), st.table);
+    const v = fn(inp.value.trim(), F.fuelSettings(m).table);
     outEl.textContent = v == null ? '' : `${v.toFixed(d)} ${unit}`;
   });
   cv(document.getElementById('cvMm'), document.getElementById('cvL'), F.litresFromMm, 'L', 1);
   cv(document.getElementById('cvL2'), document.getElementById('cvMm2'), F.mmFromLitres, 'mm', 0);
   document.getElementById('toSetup').onclick = () => { ui.view = 'session'; renderMeeting(m); window.scrollTo(0, 0); };
+
+  // Tank table: edit in place, saved as you type, used by every event.
+  if (!state.tank) state.tank = F.FUEL_DEFAULTS.table.map((r) => r.map(String));
+  const rowsEl = document.getElementById('tankRows');
+  const saveTank = () => {
+    F.setTankTable(state.tank);
+    store.save(state);
+    show(F.fuelCalc(m, s));
+  };
+  const drawTank = () => {
+    rowsEl.innerHTML = state.tank.map(([mm, l], i) => `
+      <div class="tank-row">
+        <input data-tank="${i}:0" value="${esc(mm)}" inputmode="decimal" placeholder="mm" aria-label="Row ${i + 1} mm">
+        <input data-tank="${i}:1" value="${esc(l)}" inputmode="decimal" placeholder="L" aria-label="Row ${i + 1} litres">
+        <button class="sm" data-del-tank="${i}" aria-label="Delete row ${i + 1}">✕</button>
+      </div>`).join('');
+    rowsEl.querySelectorAll('[data-tank]').forEach((el) => {
+      el.addEventListener('input', () => {
+        const [i, j] = el.dataset.tank.split(':').map(Number);
+        state.tank[i][j] = el.value.trim();
+        saveTank();
+      });
+      el.addEventListener('focus', () => el.select());
+    });
+    rowsEl.querySelectorAll('[data-del-tank]').forEach((b) => b.onclick = () => {
+      state.tank.splice(Number(b.dataset.delTank), 1);
+      saveTank(); drawTank();
+    });
+  };
+  drawTank();
+  document.getElementById('addTankRow').onclick = () => {
+    state.tank.push(['', '']);
+    drawTank();
+    rowsEl.querySelector(`[data-tank="${state.tank.length - 1}:0"]`).focus();
+  };
+  document.getElementById('resetTank').onclick = () => {
+    if (!confirm('Put the tank table back to the original values from the spreadsheet?')) return;
+    state.tank = F.FUEL_DEFAULTS.table.map((r) => r.map(String));
+    saveTank(); drawTank();
+  };
 }
 
 function openFuelSettings(m) {
@@ -1171,8 +1221,7 @@ function openFuelSettings(m) {
       <label class="field">Min weight (kg)<input name="minWeight" value="${esc(st.minWeight)}" inputmode="decimal"></label>
       <label class="field">Margin (kg above min weight)<input name="margin" value="${esc(st.margin)}" inputmode="decimal"></label>
       <label class="field">Fuel density (kg per litre)<input name="density" value="${esc(st.density)}" inputmode="decimal"></label>
-      <label class="field">Tank table – dipstick mm = litres, one per line
-        <textarea name="table" rows="9">${esc(st.table.map(([a, b]) => `${a} = ${b}`).join('\n'))}</textarea></label>
+      <div class="mute">The tank table (dipstick mm = litres) is on the Fuel page and is shared by all events.</div>
       <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
     </form>`);
   d.querySelector('form').addEventListener('submit', () => {
@@ -1182,10 +1231,6 @@ function openFuelSettings(m) {
       const v = String(fd.get(k)).trim();
       if (v !== '' && !isNaN(Number(v))) fuel[k] = Number(v);
     }
-    const table = String(fd.get('table')).split('\n')
-      .map((l) => l.split(/[=,:\s]+/).filter(Boolean).map(Number))
-      .filter((p) => p.length === 2 && p.every((x) => isFinite(x)));
-    if (table.length >= 2) fuel.table = table; else toast('Tank table needs at least 2 lines – kept the old one');
     m.fuel = fuel;
     touch(m);
     renderMeeting(m);
@@ -1196,37 +1241,55 @@ function openFuelSettings(m) {
 // Speech-to-text where the browser offers it (Safari's webkitSpeechRecognition). The iPhone
 // keyboard's own dictation (mic key) also works in any text box.
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-let activeRec = null;
+// One recogniser, reused: iPhone Safari is unreliable when a fresh one is created for each go,
+// and reusing it means fewer microphone prompts.
+let recog = null;
+let listening = false;
 
 function dictate(textarea, onText) {
   const btn = document.getElementById('dictate');
-  if (activeRec) { activeRec.stop(); return; }
-  const rec = new SpeechRec();
-  rec.lang = navigator.language || 'en-GB';
-  rec.continuous = true;
-  rec.interimResults = true;
-  const start = textarea.value.trim();
-  let finalText = '';
-  rec.onresult = (e) => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const r = e.results[i];
-      if (r.isFinal) finalText += r[0].transcript.trim() + ' '; else interim += r[0].transcript;
-    }
-    textarea.value = [start, (finalText + interim).trim()].filter(Boolean).join(start ? '\n' : '');
-    onText(textarea.value);
+  const setBtn = (on) => {
+    const b = document.getElementById('dictate');
+    if (!b) return;
+    b.classList.toggle('on', on);
+    b.textContent = on ? '■ Stop' : '🎤 Dictate';
   };
-  rec.onerror = (e) => {
-    toast(e.error === 'not-allowed' ? 'Microphone not allowed – use the keyboard mic instead' : 'Dictation stopped');
-  };
-  rec.onend = () => { activeRec = null; btn.classList.remove('on'); btn.textContent = '🎤 Dictate'; };
-  try {
-    rec.start();
-    activeRec = rec;
-    btn.classList.add('on'); btn.textContent = '■ Stop';
-  } catch {
-    toast('Dictation not available – use the keyboard mic instead');
+  if (!recog) {
+    recog = new SpeechRec();
+    recog.lang = navigator.language || 'en-GB';
+    recog.continuous = false;      // one phrase per go: the reliable mode on iPhone
+    recog.interimResults = true;
   }
+  if (listening) { try { recog.stop(); } catch { /* already stopped */ } return; }
+
+  const start = textarea.value.replace(/\s+$/, '');
+  let heard = '';
+  recog.onresult = (e) => {
+    let text = '';
+    for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+    heard = text.trim();
+    // the textarea may have been re-drawn since; write to the one on screen now
+    const ta = document.getElementById('notes') || textarea;
+    ta.value = start ? `${start}\n${heard}` : heard;
+    onText(ta.value);
+  };
+  recog.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Microphone not allowed – use the keyboard mic instead');
+    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast(`Dictation stopped (${e.error})`);
+  };
+  recog.onend = () => { listening = false; setBtn(false); };
+  const go = () => { recog.start(); listening = true; setBtn(true); };
+  try {
+    go();
+  } catch {
+    // still winding down from last time: reset and try again
+    try { recog.abort(); } catch { /* ignore */ }
+    recog = null;
+    setTimeout(() => {
+      try { dictate(textarea, onText); } catch { toast('Dictation not available – use the keyboard mic instead'); }
+    }, 250);
+  }
+  if (!btn) setBtn(listening);
 }
 
 // ---------- Misc ----------

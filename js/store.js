@@ -189,7 +189,13 @@ function upgradeSession(s) {
 
 function normalise(data) {
   const setups = Array.isArray(data?.setups) ? data.setups : [];
-  if (!data || !Array.isArray(data.meetings)) return { version: 3, meetings: [], setups };
+  // Fuel tank table (dipstick mm = litres) is shared by every event. Earlier it was per event.
+  let tank = Array.isArray(data?.tank) ? data.tank : null;
+  if (!tank && Array.isArray(data?.meetings)) {
+    const withTable = data.meetings.filter((m) => Array.isArray(m.fuel?.table)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (withTable.length) tank = withTable[0].fuel.table;
+  }
+  if (!data || !Array.isArray(data.meetings)) return { version: 3, meetings: [], setups, tank };
   for (const m of data.meetings) {
     if (!Array.isArray(m.sessions)) {
       // v1: fixed sessions keyed t1..f. Keep the ones that were used.
@@ -218,7 +224,8 @@ function normalise(data) {
     if (m.sessions.map((s) => s.name).join('|') === LEGACY_NAMES) m.sessions.forEach((s) => { s.name = ''; });
     if (!m.sessions.length) m.sessions.push(newSession());
   }
-  return { version: 3, meetings: data.meetings, setups };
+  for (const m of data.meetings) if (m.fuel) delete m.fuel.table;
+  return { version: 3, meetings: data.meetings, setups, tank };
 }
 
 export function load() {
@@ -249,6 +256,7 @@ export function importJSON(state, text) {
     if (i === -1) { state.meetings.push(m); added++; }
     else if ((m.updatedAt || 0) > (state.meetings[i].updatedAt || 0)) { state.meetings[i] = m; updated++; }
   }
+  if (incoming.tank && !state.tank) state.tank = incoming.tank;
   for (const s of incoming.setups) {
     if (!state.setups.some((x) => x.id === s.id)) { state.setups.push(s); added++; }
   }
