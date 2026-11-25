@@ -13,7 +13,7 @@ export const TIMES = [
   { id: 'tyre',    label: 'Tyre',     kind: 'text', wide: true, carry: true, placeholder: 'e.g. Komet K2H set 1' },
   { id: 'comment', label: 'Comment',  kind: 'text', wide: true, placeholder: 'Short comment' },
   { id: 'time',    label: 'Time',     kind: 'num' },
-  { id: 'refTime', label: 'Ref time', kind: 'num' },
+  { id: 'refTime', label: 'Ref Time', kind: 'num' },
 ];
 
 // Setup rows. `sides` lists which of Front (f) / Rear (r) can be adjusted;
@@ -25,25 +25,25 @@ export const TIMES = [
 //       'select' -> drop-down of `options` (stub pos, pinion)
 //       'caster' -> top / bottom positions, caster degrees calculated
 export const FIELDS = [
-  { id: 'hotPressure',  label: 'Target hot', kind: 'num', link: 'pressure', sides: ['f', 'r'] },
+  { id: 'hotPressure',  label: 'Target Hot', kind: 'num', link: 'pressure', sides: ['f', 'r'] },
   { id: 'camber',       label: 'Camber', kind: 'dir', options: ['POS', 'NEG'], sides: ['f'] },
   { id: 'caster',       label: 'Caster', kind: 'caster', ref: 'caster', sides: ['f'] },
   { id: 'toe',          label: 'Toe', kind: 'dir', options: ['IN', 'OUT'], sides: ['f'] },
-  { id: 'steeringYoke', label: 'Steering yoke', kind: 'choice', sides: ['f'],
+  { id: 'steeringYoke', label: 'Steering Yoke', kind: 'choice', sides: ['f'],
     options: [{ v: 'SHORT', note: 'LIGHT' }, { v: 'LONG', note: 'HEAVY' }] },
-  { id: 'stubPos',      label: 'Stub pos', kind: 'select', options: ['1', '2', '3', '4', '5'], ref: 'stub', sides: ['f'] },
+  { id: 'stubPos',      label: 'Stub Pos', kind: 'select', options: ['1', '2', '3', '4', '5'], ref: 'stub', sides: ['f'] },
   { id: 'width',        label: 'Width', kind: 'num', sides: ['f', 'r'] },
   { id: 'wbase',        label: 'Wheelbase', kind: 'choice', options: ['S', 'M', 'L'], sides: ['r'] },
-  { id: 'seatH',        label: 'Seat height', kind: 'text', wideInput: true, sides: ['r'] },
-  { id: 'weightDist',   label: 'Weight dist', kind: 'num', sides: ['r'] },
-  { id: 'rideH',        label: 'Ride height', kind: 'select', options: ['LOW', 'STD', 'HIGH'], sides: ['f', 'r'] },
+  { id: 'seatH',        label: 'Seat Height', kind: 'text', wideInput: true, sides: ['r'] },
+  { id: 'weightDist',   label: 'Weight Dist', kind: 'num', sides: ['r'] },
+  { id: 'rideH',        label: 'Ride Height', kind: 'select', options: ['LOW', 'STD', 'HIGH'], sides: ['f', 'r'] },
   { id: 'third',        label: '3rd', kind: 'choice', options: ['IN', 'OUT'], sides: ['r'] },
-  { id: 'fBar',         label: 'Front bar', kind: 'choice', options: ['OUT', 'NYLON', 'STEEL'], sides: ['f'] },
+  { id: 'fBar',         label: 'Front Bar', kind: 'choice', options: ['OUT', 'NYLON', 'STEEL'], sides: ['f'] },
   { id: 'jet',          label: 'Jet', kind: 'num', sides: ['r'] },
   { id: 'pinion',       label: 'Pinion', kind: 'select', options: ['10', '11', '12', '13', '14'], sides: ['r'] },
   { id: 'sprocket',     label: 'Sprocket', kind: 'num', sides: ['r'] },
-  { id: 'brkPedal',     label: 'Brake pedal pos', kind: 'num', hint: '1 = top', ref: 'brake', sides: ['r'] },
-  { id: 'brkCyl',       label: 'Master cyl pos', kind: 'text', sides: ['r'] },
+  { id: 'brkPedal',     label: 'Brake Pedal Pos', kind: 'num', hint: '1 = top', ref: 'brake', sides: ['r'] },
+  { id: 'brkCyl',       label: 'Master Cyl Pos', kind: 'text', sides: ['r'] },
   { id: 'other1',       label: 'Other', kind: 'text', sides: ['f', 'r'] },
   { id: 'other2',       label: 'Other', kind: 'text', sides: ['f', 'r'] },
   { id: 'other3',       label: 'Other', kind: 'text', sides: ['f', 'r'] },

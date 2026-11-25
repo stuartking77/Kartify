@@ -548,9 +548,9 @@ function renderPressure(m, s) {
   const tyreLabel = (x) => x.name.trim() || `Tyre ${s.tyres.indexOf(x) + 1}`;
   const CALC = [
     { id: 'ref', label: `Ref @ ${st.refTemp}°`, f: (c) => fmt(c.ref, 2) },
-    { id: 'riseCoeff', label: 'Rise coeff', f: (c) => (c.riseCoeff == null ? '–' : (c.riseCoeff * 100).toFixed(1) + '%') },
-    { id: 'corrDelta', label: 'Corr delta', f: (c) => fmtSigned(c.corrDelta) },
-    { id: 'corrCold', label: 'Corr cold', f: (c) => fmt(c.corrCold), main: true },
+    { id: 'riseCoeff', label: 'Rise Coeff', f: (c) => (c.riseCoeff == null ? '–' : (c.riseCoeff * 100).toFixed(1) + '%') },
+    { id: 'corrDelta', label: 'Corr Delta', f: (c) => fmtSigned(c.corrDelta) },
+    { id: 'corrCold', label: 'Corr Cold', f: (c) => fmt(c.corrCold), main: true },
   ];
   const HINT = { hot: 'came in at', target: 'Corr uses this; blank = Setup' };
   const FILL_ALL = ['rimT'];
@@ -574,7 +574,7 @@ function renderPressure(m, s) {
       ${P.P_INPUTS.map((p) => `
         ${p.id === 'target' ? `
         <div class="prow setup-target axle-row">
-          <div class="flabel">Setup target<div class="hint">from Setup sheet</div></div>
+          <div class="flabel">Setup Target<div class="hint">from Setup sheet</div></div>
           ${['lf', 'lr'].map((c) => `<div class="cell out span2 ${c === 'lf' ? 'gap' : ''}">${esc(P.setupTarget(m, s, c) || '–')}</div>`).join('')}
         </div>
         <div class="prow axle-row">
@@ -1084,7 +1084,7 @@ function fuelSummaryHTML(m, s) {
   return `
     <div class="card fuel-sum">
       <button class="fuel-top link" data-goto="fuel" aria-label="Open fuel page"><h3>Fuel</h3>${CHEV}</button>
-      ${[['start', 'Fuel start', c.startL], ['end', 'Fuel end', c.endL]].map(([k, name, l]) => `
+      ${[['start', 'Fuel Start', c.startL], ['end', 'Fuel End', c.endL]].map(([k, name, l]) => `
         <div class="fuel-line">
           <button class="flabel ref" data-goto="fuel">${name}</button>
           <input data-fuel="${k}" value="${esc(f[k] ?? '')}" inputmode="decimal" placeholder="mm" autocomplete="off" aria-label="${name} mm">
@@ -1128,24 +1128,24 @@ function renderFuel(m, s) {
     </div>
     <div class="card fuel">
       <h3>Consumption</h3>
-      ${row('Session mins', input('mins', 'mins', 'Session minutes'))}
-      ${row('Used / min', out('perMin', 'L'))}
-      ${row('Next session mins', input('nextMins', 'mins', 'Next session minutes'))}
-      ${row('Fuel needed to add', out('needed', 'L'))}
-      ${row('Total needed', out('totalNeeded', 'L'), 'in tank at the start')}
+      ${row('Session Mins', input('mins', 'mins', 'Session minutes'))}
+      ${row('Used / Min', out('perMin', 'L'))}
+      ${row('Next Session Mins', input('nextMins', 'mins', 'Next session minutes'))}
+      ${row('Fuel Needed To Add', out('needed', 'L'))}
+      ${row('Total Needed', out('totalNeeded', 'L'), 'in tank at the start')}
     </div>
     <div class="card fuel">
       <h3>Weight</h3>
-      ${row('Weight at end of session', input('endWeight', 'kg', 'Weight at end of session'))}
+      ${row('Weight At End Of Session', input('endWeight', 'kg', 'Weight at end of session'))}
       ${row('Delta', out('delta', 'kg'), 'vs min weight + margin')}
-      ${row('Fuel req for weight', out('forWeight', 'L'))}
+      ${row('Fuel Req For Weight', out('forWeight', 'L'))}
       ${row('<b>Uplift</b>', out('uplift', 'L'), 'fuel needed + fuel for weight')}
-      ${row('Total in tank', out('upliftTotal', 'L'))}
+      ${row('Total In Tank', out('upliftTotal', 'L'))}
     </div>
     <div class="card fuel main">
       <h3>Fill to</h3>
-      ${row('Litres to add', input('add', '', 'Litres to add'), 'blank = uplift')}
-      ${row('In tank', out('inTank', 'L'))}
+      ${row('Litres To Add', input('add', '', 'Litres to add'), 'blank = uplift')}
+      ${row('In Tank', out('inTank', 'L'))}
       ${row('<b>Dipstick</b>', out('fillMm', 'mm'))}
     </div>
     <div class="card fuel">

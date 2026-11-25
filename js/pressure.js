@@ -10,9 +10,9 @@ const ATM = 14.5; // psi, to work in absolute pressure
 
 export const P_INPUTS = [
   { id: 'rimT',   label: 'Rim T',        unit: '°C' },
-  { id: 'cold',   label: 'Cold set',     unit: 'psi' },
-  { id: 'hot',    label: 'Hot pressure', unit: 'psi' },
-  { id: 'target', label: 'New target',   unit: 'psi' },
+  { id: 'cold',   label: 'Cold Set',     unit: 'psi' },
+  { id: 'hot',    label: 'Hot Pressure', unit: 'psi' },
+  { id: 'target', label: 'New Target',   unit: 'psi' },
 ];
 
 // Four corners; `axle` links each to the Front/Rear target in the Setup.
