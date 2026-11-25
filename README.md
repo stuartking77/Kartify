@@ -26,6 +26,7 @@ full screen and works offline at the track.
   clipboard where *Paste* puts those pressures and their rim temps into another tyre or session.
   Tap *Cold set ›* (or *Adjust pressures & rim temp*) for a pop-up: set a new rim temp for all tyres or each tyre
   with or without temp compensation (psi per °C), nudge front and/or rear by 0.1 psi, preview, apply.
+  Adjusted boxes get an amber dot; *Revert adjustment* puts them back. Hot pressure boxes are red.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
 - **Reference pop-ups**: tap Caster, Stub pos or Brake pedal (marked ⓘ) for the caster table, stub position diagram and brake position. Tap a value in the pop-up to select it.

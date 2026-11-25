@@ -553,7 +553,7 @@ function renderPressure(m, s) {
             : `<div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}
             ${FILL_ALL.includes(p.id) ? `<button class="fill-all" data-fill="${p.id}">Copy to all</button>` : ''}</div>`}
           ${P.CORNERS.map((c) => `
-            <div class="cell ${c.id === 'rf' ? 'gap' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
+            <div class="cell ${c.id === 'rf' ? 'gap' : ''} ${isAdj(t, c.id, p.id) ? 'adj' : ''} ${p.id === 'hot' ? 'hot' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
               placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, c.id) : '')}" inputmode="decimal" autocomplete="off"
               aria-label="${p.label} ${c.id.toUpperCase()}"></div>`).join('')}
         </div>`).join('')}
@@ -564,7 +564,11 @@ function renderPressure(m, s) {
           ${P.CORNERS.map((c) => `<div class="cell out ${c.id === 'rf' ? 'gap' : ''}" data-calc="${k.id}" data-side="${c.id}"></div>`).join('')}
         </div>`).join('')}
     </div>
-    <button id="adjustBtn" class="adjust-btn" data-adjust>Adjust pressures &amp; rim temp</button>
+    <div class="row adj-actions">
+      <button id="adjustBtn" class="adjust-btn" data-adjust>Adjust pressures &amp; rim temp</button>
+      ${t.adjusted ? '<button id="revertAdj" class="revert-btn">Revert adjustment</button>' : ''}
+    </div>
+    ${t.adjusted ? '<div class="mute adj-note"><span class="adj-dot"></span> adjusted values</div>' : ''}
     <div class="row">
       <button id="copyCold" style="flex:1">Copy cold set</button>
       <button id="copyCorr" style="flex:1">Copy corr cold</button>
@@ -595,10 +599,28 @@ function renderPressure(m, s) {
   });
   const coldInput = (c) => $app.querySelector(`input[data-p="cold"][data-side="${c}"]`);
   $app.querySelectorAll('[data-adjust]').forEach((b) => b.onclick = () => adjustSheet(m, s, t));
+  // Typing over an adjusted value removes its marker.
+  const unmark = (c, field) => {
+    const marks = t.adjusted?.marks?.[c];
+    if (!marks || !marks.includes(field)) return;
+    t.adjusted.marks[c] = marks.filter((x) => x !== field);
+    $app.querySelector(`input[data-p="${field}"][data-side="${c}"]`).parentElement.classList.remove('adj');
+  };
+  document.getElementById('revertAdj')?.addEventListener('click', () => {
+    if (!confirm('Put the cold pressures and rim temps back to how they were before adjusting?')) return;
+    for (const c of P.CORNERS) {
+      const b = t.adjusted.before[c.id] || {};
+      t[c.id] = { ...(t[c.id] || {}), cold: b.cold ?? '', rimT: b.rimT ?? '' };
+    }
+    delete t.adjusted;
+    touch(m); renderPressure(m, s);
+    toast('Adjustment reverted');
+  });
 
   $app.querySelectorAll('input[data-p]').forEach((el) => {
     el.addEventListener('input', () => {
       t[el.dataset.side] = { ...(t[el.dataset.side] || {}), [el.dataset.p]: el.value.trim() };
+      unmark(el.dataset.side, el.dataset.p);
       ui.lastCorner = { [el.dataset.p]: el.dataset.side, ...(ui.lastCorner || {}), [el.dataset.p]: el.dataset.side };
       touch(m); markChip(m, s); updateCalc();
       $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
@@ -617,6 +639,7 @@ function renderPressure(m, s) {
       for (const c of P.CORNERS) {
         t[c.id] = { ...(t[c.id] || {}), [id]: v };
         $app.querySelector(`input[data-p="${id}"][data-side="${c.id}"]`).value = v;
+        unmark(c.id, id);
       }
       touch(m); markChip(m, s); updateCalc();
       $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
@@ -665,8 +688,11 @@ function renderPressure(m, s) {
   };
 }
 
+const isAdj = (t, corner, field) => !!t.adjusted?.marks?.[corner]?.includes(field);
+
 // Put copied pressures (cold + rim temps) into a tyre.
 function applyClip(t, clip) {
+  delete t.adjusted;
   for (const c of P.CORNERS) {
     const v = clip.values[c.id];
     t[c.id] = { ...(t[c.id] || {}), ...(v.cold ? { cold: v.cold } : {}), ...(v.rimT ? { rimT: v.rimT } : {}) };
@@ -807,12 +833,20 @@ function adjustSheet(m, s, t) {
   d.querySelectorAll('[data-off]').forEach((b) => b.onclick = () => { st.off[b.dataset.off] += Number(b.dataset.d) / 10; show(); });
   d.querySelector('[data-a=cancel]').onclick = () => d.close();
   d.querySelector('form').addEventListener('submit', () => {
+    // Keep the values from before the first adjustment so it can be reverted.
+    const adj = t.adjusted || {
+      before: Object.fromEntries(P.CORNERS.map((c) => [c.id, { cold: t[c.id]?.cold ?? '', rimT: t[c.id]?.rimT ?? '' }])),
+      marks: {},
+    };
     for (const c of P.CORNERS) {
       const v = result(c);
       t[c.id] = { ...(t[c.id] || {}) };
-      if (v != null) t[c.id].cold = P.tidy(v);
-      if (n(st.rim[c.id]) != null) t[c.id].rimT = st.rim[c.id];
+      const marks = new Set(adj.marks[c.id] || []);
+      if (v != null) { const nv = P.tidy(v); if (nv !== (t[c.id].cold ?? '')) marks.add('cold'); t[c.id].cold = nv; }
+      if (n(st.rim[c.id]) != null) { if (st.rim[c.id] !== (t[c.id].rimT ?? '')) marks.add('rimT'); t[c.id].rimT = st.rim[c.id]; }
+      adj.marks[c.id] = [...marks];
     }
+    if (Object.values(adj.marks).some((x) => x.length)) { adj.at = Date.now(); t.adjusted = adj; }
     touch(m); markChip(m, s); renderPressure(m, s);
     toast('Pressures adjusted');
   });
