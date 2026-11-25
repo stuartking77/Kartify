@@ -553,7 +553,7 @@ function renderPressure(m, s) {
             : `<div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}
             ${FILL_ALL.includes(p.id) ? `<button class="fill-all" data-fill="${p.id}">Copy to all</button>` : ''}</div>`}
           ${P.CORNERS.map((c) => `
-            <div class="cell ${c.id === 'rf' ? 'gap' : ''} ${isAdj(t, c.id, p.id) ? 'adj' : ''} ${p.id === 'hot' ? 'hot' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
+            <div class="cell ${c.id === 'rf' ? 'gap' : ''} ${isAdj(t, c.id, p.id) ? 'adj' : ''} ${p.id === 'hot' ? 'hot' : ''} ${p.id === 'cold' ? 'cold' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
               placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, c.id) : '')}" inputmode="decimal" autocomplete="off"
               aria-label="${p.label} ${c.id.toUpperCase()}"></div>`).join('')}
         </div>`).join('')}

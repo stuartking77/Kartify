@@ -299,3 +299,8 @@ input,select,textarea{font-size:16px !important}
 .revert-btn{flex:1;color:var(--adj);border-color:rgba(255,176,32,.5);font-weight:600}
 .adj-note{display:flex;align-items:center;gap:6px;margin-top:-2px}
 .adj-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--adj)}
+/* Cold set: blue accent (adjusted boxes keep their amber border + dot) */
+:root{--cold:#4da3ff}
+.prow .cell.cold input{background:rgba(77,163,255,.08)}
+.prow .cell.cold:not(.adj) input{border-color:rgba(77,163,255,.6)}
+.prow .cell.cold input:focus{border-color:var(--cold)}
