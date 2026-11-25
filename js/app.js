@@ -541,7 +541,7 @@ function renderPressure(m, s) {
       ${P.P_INPUTS.map((p) => `
         <div class="frow">
           <div class="flabel">${p.label} <span class="unit">${p.unit}</span>
-            ${p.id === 'target' ? '<div class="hint">grey = from earlier session</div>' : ''}</div>
+            ${p.id === 'target' ? '<div class="hint">grey = from Setup</div>' : p.id === 'hot' ? '<div class="hint">what they came in at</div>' : ''}</div>
           ${['f', 'r'].map((side) => `
             <div class="cell"><input data-p="${p.id}" data-side="${side}" value="${esc(t[side]?.[p.id] ?? '')}"
               placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, side) : '')}" inputmode="decimal" autocomplete="off"></div>`).join('')}

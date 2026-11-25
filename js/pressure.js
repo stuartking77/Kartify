@@ -3,6 +3,8 @@
 
 // psiPerDeg: pressure change per °C of rim temperature. refTemp: temperature REF is quoted at.
 // refRise: the generic hot/cold rise (absolute pressure) that Rise coeff is compared against.
+import { effectiveValues } from './store.js';
+
 export const PRESSURE_DEFAULTS = { psiPerDeg: 0.1, refTemp: 5, refRise: 1.1 };
 const ATM = 14.5; // psi, to work in absolute pressure
 
@@ -10,7 +12,7 @@ export const P_INPUTS = [
   { id: 'rimT',   label: 'Rim T',        unit: '°C' },
   { id: 'cold',   label: 'Cold set',     unit: 'psi' },
   { id: 'hot',    label: 'Hot pressure', unit: 'psi' },
-  { id: 'target', label: 'Target',       unit: 'psi' },
+  { id: 'target', label: 'Target hot',   unit: 'psi' },
 ];
 
 export function settingsOf(m) {
@@ -34,8 +36,12 @@ function sameTyre(session, t, idx) {
   return list.find((x, i) => key(x, i) === key(t, idx));
 }
 
-// Target carries from this tyre's closest earlier session that had a cold pressure set.
+// Target hot pressure when not typed for this tyre: the session's target from the Setup
+// (Target hot pressure row, as carried through the sessions), else this tyre's target from
+// its closest earlier session that had a cold pressure set.
 export function carriedTarget(m, s, t, side) {
+  const setupTarget = effectiveValues(m, m.sessions.indexOf(s)).hotPressure?.[side];
+  if (setupTarget) return setupTarget;
   const idx = (s.tyres || []).indexOf(t);
   for (let i = m.sessions.indexOf(s) - 1; i >= 0; i--) {
     const pt = sameTyre(m.sessions[i], t, idx);
