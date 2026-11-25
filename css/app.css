@@ -378,7 +378,7 @@ textarea[name=table]{font-variant-numeric:tabular-nums}
 .frow .cell.span2{grid-column:span 2}
 .frow.wide-in{grid-template-columns:96px minmax(0,1fr)}
 .frow.wide-in .cell.span2{grid-column:auto}
-.frow.wide-in input{text-align:left;padding:0 10px}
+.frow.wide-in input{text-align:center;padding:0 10px}
 
 /* Green double chevron on tappable labels */
 .chev{width:15px;height:11px;color:var(--acc);vertical-align:0;margin-left:3px;flex:none}
