@@ -726,29 +726,42 @@ function adjustSheet(m, s, t) {
   const d = sheet(`
     <form method="dialog" class="sheet-body adjust">
       <h3>Adjust ${esc(t.name.trim() || `Tyre ${s.tyres.indexOf(t) + 1}`)} · ${esc(label(m, s))}</h3>
-      <div class="adj-rim">
-        <label class="field">New rim temp, all tyres (°C)
+      <section class="adj-sec">
+        <div class="adj-h">1 · Rim temp (°C)</div>
+        <div class="adj-line">
+          <span class="adj-lbl">All tyres</span>
           <div class="stepper"><button type="button" data-rim="-1">−</button>
-            <input id="adjRim" value="${esc(st.all)}" inputmode="decimal" placeholder="–">
-            <button type="button" data-rim="1">+</button></div></label>
+            <input id="adjRim" value="${esc(st.all)}" inputmode="decimal" placeholder="–" aria-label="New rim temp, all tyres">
+            <button type="button" data-rim="1">+</button></div>
+        </div>
+        <div class="adj-corners">
+          ${P.CORNERS.map((c) => `<label><span>${c.id.toUpperCase()}</span>
+            <input data-rimc="${c.id}" value="${esc(st.rim[c.id])}" inputmode="decimal" placeholder="–" aria-label="New rim temp ${c.id.toUpperCase()}">
+            <small>now ${nowRim(c) ? esc(nowRim(c)) + '°' : '–'}</small></label>`).join('')}
+        </div>
         <label class="switch-row"><input type="checkbox" id="adjComp" checked>
-          <span>Temp compensation<small>cold pressure changes ${psi} psi per °C</small></span></label>
-      </div>
-      <div class="nudge-row">
-        ${[['f', 'Front'], ['r', 'Rear']].map(([ax, name]) => `
-          <div class="nudge-axle">
-            <span>${name}</span>
-            <button type="button" data-off="${ax}" data-d="-1" aria-label="${name} minus 0.1">−</button>
-            <b id="off-${ax}"></b>
-            <button type="button" data-off="${ax}" data-d="1" aria-label="${name} plus 0.1">+</button>
-          </div>`).join('')}
-      </div>
-      <table class="adj-preview">
-        <tr><th></th><th>LF</th><th>RF</th><th>LR</th><th>RR</th></tr>
-        <tr><td>Now</td>${P.CORNERS.map((c) => `<td>${esc(t[c.id]?.cold || '–')}<small>${nowRim(c) ? esc(nowRim(c)) + '°' : ''}</small></td>`).join('')}</tr>
-        <tr class="rim-row"><td>New rim °C</td>${P.CORNERS.map((c) => `<td><input data-rimc="${c.id}" value="${esc(st.rim[c.id])}" inputmode="decimal" placeholder="–" aria-label="New rim temp ${c.id.toUpperCase()}"></td>`).join('')}</tr>
-        <tr class="new"><td>New cold</td>${P.CORNERS.map((c) => `<td data-new="${c.id}"></td>`).join('')}</tr>
-      </table>
+          <span>Temp compensation<small>cold pressure changes ${psi} psi per °C of rim temp</small></span></label>
+      </section>
+      <section class="adj-sec">
+        <div class="adj-h">2 · Pressure adjust (psi)</div>
+        <div class="nudge-row">
+          ${[['f', 'Front'], ['r', 'Rear']].map(([ax, name]) => `
+            <div class="nudge-axle">
+              <span>${name}</span>
+              <button type="button" data-off="${ax}" data-d="-1" aria-label="${name} minus 0.1">−</button>
+              <b id="off-${ax}"></b>
+              <button type="button" data-off="${ax}" data-d="1" aria-label="${name} plus 0.1">+</button>
+            </div>`).join('')}
+        </div>
+      </section>
+      <section class="adj-sec result">
+        <div class="adj-h">3 · Cold set</div>
+        <table class="adj-preview">
+          <tr><th></th><th>LF</th><th>RF</th><th>LR</th><th>RR</th></tr>
+          <tr><td>Now</td>${P.CORNERS.map((c) => `<td>${esc(t[c.id]?.cold || '–')}</td>`).join('')}</tr>
+          <tr class="new"><td>New</td>${P.CORNERS.map((c) => `<td data-new="${c.id}"></td>`).join('')}</tr>
+        </table>
+      </section>
       <div class="row">
         <button type="button" data-a="cancel" style="flex:1">Cancel</button>
         <button class="pri" value="apply" style="flex:2">Apply</button>
