@@ -27,14 +27,14 @@ export function settingsOf(m) {
 }
 
 export function newTyre(name = '') {
-  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, lf: {}, rf: {}, lr: {}, rr: {} };
+  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, lf: {}, rf: {}, lr: {}, rr: {}, targets: {} };
 }
 
 const num = (v) => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
 const key = (t, i) => (t.name || '').trim().toLowerCase() || `#${i}`;
 
 export function tyreHasData(t) {
-  return CORNERS.some((c) => P_INPUTS.some((p) => (t[c.id]?.[p.id] ?? '') !== ''));
+  return CORNERS.some((c) => P_INPUTS.some((p) => (t[c.id]?.[p.id] ?? '') !== '')) || ['f', 'r'].some((a) => (t.targets?.[a] ?? '') !== '');
 }
 
 // Same tyre (by name, or by position if unnamed) in an earlier session.
@@ -51,13 +51,15 @@ export function setupTarget(m, s, corner) {
 // Target hot pressure when not typed for this tyre: the session's target from the Setup
 // (Target hot pressure row, as carried through the sessions), else this tyre's target from
 // its closest earlier session that had a cold pressure set.
+// `side` may be a corner (lf…) or an axle (f / r). Targets are per axle.
 export function carriedTarget(m, s, t, side) {
-  const setupTarget = effectiveValues(m, m.sessions.indexOf(s)).hotPressure?.[axleOf(side)];
+  const axle = side.length === 1 ? side : axleOf(side);
+  const setupTarget = effectiveValues(m, m.sessions.indexOf(s)).hotPressure?.[axle];
   if (setupTarget) return setupTarget;
   const idx = (s.tyres || []).indexOf(t);
   for (let i = m.sessions.indexOf(s) - 1; i >= 0; i--) {
     const pt = sameTyre(m.sessions[i], t, idx);
-    if (pt && (pt[side]?.cold ?? '') !== '' && (pt[side]?.target ?? '') !== '') return pt[side].target;
+    if (pt && (pt.targets?.[axle] ?? '') !== '') return pt.targets[axle];
   }
   return '';
 }
@@ -67,7 +69,7 @@ export function calc(m, s, t, side) {
   const st = settingsOf(m);
   const v = t[side] || {};
   const rimT = num(v.rimT), K = num(v.cold), Q = num(v.hot);
-  const W = num(v.target ?? '') ?? num(carriedTarget(m, s, t, side));
+  const W = num(t.targets?.[axleOf(side)] ?? '') ?? num(carriedTarget(m, s, t, side));
   const rise = num(st.refRise) ?? PRESSURE_DEFAULTS.refRise;
   const out = { ref: null, riseCoeff: null, corrDelta: null, corrCold: null, target: W };
   if (rimT != null && K != null) out.ref = (st.refTemp - rimT) * st.psiPerDeg + K;
@@ -85,6 +87,15 @@ export function calc(m, s, t, side) {
 export function upgradeTyre(t) {
   if (t.f || t.r) { t.lf ||= t.f || {}; t.lr ||= t.r || {}; delete t.f; delete t.r; }
   for (const c of CORNERS) t[c.id] ||= {};
+  // Targets used to be per tyre corner; they are per axle (front / rear).
+  if (!t.targets) {
+    t.targets = {};
+    for (const [axle, corners] of [['f', ['lf', 'rf']], ['r', ['lr', 'rr']]]) {
+      const v = corners.map((c) => t[c].target).find((x) => x != null && x !== '');
+      if (v) t.targets[axle] = v;
+    }
+  }
+  for (const c of CORNERS) delete t[c.id].target;
 }
 
 export function initialTyres(m, s, sessionTyreName) {

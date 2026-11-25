@@ -304,3 +304,11 @@ input,select,textarea{font-size:16px !important}
 .prow .cell.cold input{background:rgba(77,163,255,.08)}
 .prow .cell.cold:not(.adj) input{border-color:rgba(77,163,255,.6)}
 .prow .cell.cold input:focus{border-color:var(--cold)}
+
+/* Rim temp: green accent (adjusted boxes keep amber) */
+.prow .cell.rim input{background:rgba(52,211,153,.07)}
+.prow .cell.rim:not(.adj) input{border-color:rgba(52,211,153,.55)}
+/* Targets are per axle: one box spanning L + R */
+.prow.axle-row{grid-template-columns:minmax(0,1fr) 113px 113px}
+.prow.axle-row .cell.span2.gap{margin-right:6px}
+@media (max-width:370px){.prow.axle-row{grid-template-columns:minmax(0,1fr) 101px 101px}}

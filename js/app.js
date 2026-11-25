@@ -523,7 +523,7 @@ function renderPressure(m, s) {
     { id: 'corrCold', label: 'Corr cold', f: (c) => fmt(c.corrCold), main: true },
   ];
   const HINT = { hot: 'came in at', target: 'Corr uses this; blank = Setup' };
-  const FILL_ALL = ['rimT', 'target'];
+  const FILL_ALL = ['rimT'];
 
   $app.innerHTML = `
     <div class="ptop">
@@ -543,20 +543,27 @@ function renderPressure(m, s) {
       <div class="prow psub"><span></span>${P.CORNERS.map((c) => `<span>${c.label}</span>`).join('')}</div>
       ${P.P_INPUTS.map((p) => `
         ${p.id === 'target' ? `
-        <div class="prow setup-target">
+        <div class="prow setup-target axle-row">
           <div class="flabel">Setup target<div class="hint">from Setup sheet</div></div>
-          ${P.CORNERS.map((c) => `<div class="cell out ${c.id === 'rf' ? 'gap' : ''}">${esc(P.setupTarget(m, s, c.id) || '–')}</div>`).join('')}
-        </div>` : ''}
+          ${['lf', 'lr'].map((c) => `<div class="cell out span2 ${c === 'lf' ? 'gap' : ''}">${esc(P.setupTarget(m, s, c) || '–')}</div>`).join('')}
+        </div>
+        <div class="prow axle-row">
+          <div class="flabel">${p.label}<div class="hint">${HINT.target}</div></div>
+          ${['f', 'r'].map((ax) => `
+            <div class="cell span2 target ${ax === 'f' ? 'gap' : ''}"><input data-tgt="${ax}" value="${esc(t.targets?.[ax] ?? '')}"
+              placeholder="${esc(P.carriedTarget(m, s, t, ax))}" inputmode="decimal" autocomplete="off"
+              aria-label="New target ${ax === 'f' ? 'front' : 'rear'}"></div>`).join('')}
+        </div>` : `
         <div class="prow">
           ${p.id === 'cold'
             ? `<button class="flabel ref" data-adjust>${p.label} <span class="go">›</span><div class="hint">tap to adjust</div></button>`
             : `<div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}
             ${FILL_ALL.includes(p.id) ? `<button class="fill-all" data-fill="${p.id}">Copy to all</button>` : ''}</div>`}
           ${P.CORNERS.map((c) => `
-            <div class="cell ${c.id === 'rf' ? 'gap' : ''} ${isAdj(t, c.id, p.id) ? 'adj' : ''} ${p.id === 'hot' ? 'hot' : ''} ${p.id === 'cold' ? 'cold' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
+            <div class="cell ${c.id === 'rf' ? 'gap' : ''} ${isAdj(t, c.id, p.id) ? 'adj' : ''} ${p.id === 'hot' ? 'hot' : ''} ${p.id === 'cold' ? 'cold' : ''} ${p.id === 'rimT' ? 'rim' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
               placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, c.id) : '')}" inputmode="decimal" autocomplete="off"
               aria-label="${p.label} ${c.id.toUpperCase()}"></div>`).join('')}
-        </div>`).join('')}
+        </div>`}`).join('')}
       <div class="calc-head">Calculated</div>
       ${CALC.map((k) => `
         <div class="prow calc ${k.main ? 'main' : ''}">
@@ -617,6 +624,14 @@ function renderPressure(m, s) {
     toast('Adjustment reverted');
   });
 
+  $app.querySelectorAll('input[data-tgt]').forEach((el) => {
+    el.addEventListener('input', () => {
+      t.targets = { ...(t.targets || {}), [el.dataset.tgt]: el.value.trim() };
+      touch(m); markChip(m, s); updateCalc();
+      $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
+    });
+    el.addEventListener('focus', () => el.select());
+  });
   $app.querySelectorAll('input[data-p]').forEach((el) => {
     el.addEventListener('input', () => {
       t[el.dataset.side] = { ...(t[el.dataset.side] || {}), [el.dataset.p]: el.value.trim() };
@@ -653,7 +668,8 @@ function renderPressure(m, s) {
     pasteBtn.hidden = false;
     const v = ui.clip.values;
     pasteBtn.innerHTML = `Paste: cold ${P.CORNERS.map((c) => v[c.id].cold || '–').join(' / ')}`
-      + (P.CORNERS.some((c) => v[c.id].rimT) ? `<small>rim T ${P.CORNERS.map((c) => v[c.id].rimT || '–').join(' / ')}</small>` : '');
+      + (P.CORNERS.some((c) => v[c.id].rimT) ? `<small>rim T ${P.CORNERS.map((c) => v[c.id].rimT || '–').join(' / ')}</small>` : '')
+      + (ui.clip.targets?.f || ui.clip.targets?.r ? `<small>new target F ${ui.clip.targets.f || '–'} / R ${ui.clip.targets.r || '–'}</small>` : '');
   };
   showPaste();
   const copy = (what) => {
@@ -666,7 +682,7 @@ function renderPressure(m, s) {
       };
     }
     if (!Object.values(values).some((x) => x.cold)) { toast(what === 'cold' ? 'No cold set to copy' : 'No corr cold to copy'); return; }
-    ui.clip = { values, what: what === 'cold' ? 'cold set' : 'corr cold', from: `${tyreLabel(t)}, ${label(m, s)}`, name: t.name.trim() };
+    ui.clip = { values, targets: { ...(t.targets || {}) }, what: what === 'cold' ? 'cold set' : 'corr cold', from: `${tyreLabel(t)}, ${label(m, s)}`, name: t.name.trim() };
     showPaste();
     sendClipSheet(m);
   };
@@ -697,6 +713,7 @@ function applyClip(t, clip) {
     const v = clip.values[c.id];
     t[c.id] = { ...(t[c.id] || {}), ...(v.cold ? { cold: v.cold } : {}), ...(v.rimT ? { rimT: v.rimT } : {}) };
   }
+  for (const ax of ['f', 'r']) if (clip.targets?.[ax]) (t.targets ||= {})[ax] = clip.targets[ax];
 }
 
 // After copying: send to a new tyre in any session, or keep in the clipboard.
@@ -705,10 +722,11 @@ function sendClipSheet(m) {
   const v = clip.values;
   const d = sheet(`
     <div class="sheet-body">
-      <h3>Copied ${esc(clip.what)} + rim temps</h3>
+      <h3>Copied ${esc(clip.what)}, rim temps + target</h3>
       <div class="mute">From ${esc(clip.from)}<br>
         Cold ${P.CORNERS.map((c) => esc(v[c.id].cold || '–')).join(' / ')}
-        ${P.CORNERS.some((c) => v[c.id].rimT) ? ` · rim T ${P.CORNERS.map((c) => esc(v[c.id].rimT || '–')).join(' / ')}` : ''}</div>
+        ${P.CORNERS.some((c) => v[c.id].rimT) ? ` · rim T ${P.CORNERS.map((c) => esc(v[c.id].rimT || '–')).join(' / ')}` : ''}
+        ${clip.targets?.f || clip.targets?.r ? `<br>New target F ${esc(clip.targets.f || '–')} / R ${esc(clip.targets.r || '–')}` : ''}</div>
       <label class="field">New tyre name<input id="clipName" value="${esc(clip.name)}" placeholder="e.g. Set 2 (scrubbed)" autocapitalize="words"></label>
       <div class="mute">Send to (goes into that tyre if the session already has it, otherwise a new tyre):</div>
       <div class="send-list">
