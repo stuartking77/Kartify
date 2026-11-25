@@ -229,3 +229,4 @@ input.small-in{width:90px;text-align:center}
 .prow.calc.main .cell.out{color:var(--acc);font-weight:700}
 .prow.calc.main .flabel{font-weight:600}
 .fill-all{display:block;margin-top:3px;padding:2px 7px;font-size:11px;border-radius:6px;color:var(--acc);border-color:rgba(52,211,153,.4);background:none}
+#pastePress small{display:block;font-size:12px;font-weight:500;opacity:.8}

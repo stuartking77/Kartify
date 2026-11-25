@@ -617,26 +617,34 @@ function renderPressure(m, s) {
   const showPaste = () => {
     if (!ui.clip) return;
     pasteBtn.hidden = false;
-    pasteBtn.textContent = `Paste as cold set: ${P.CORNERS.map((c) => ui.clip.values[c.id] || '–').join(' / ')}`;
+    const v = ui.clip.values;
+    pasteBtn.innerHTML = `Paste: cold ${P.CORNERS.map((c) => v[c.id].cold || '–').join(' / ')}`
+      + (P.CORNERS.some((c) => v[c.id].rimT) ? `<small>rim T ${P.CORNERS.map((c) => v[c.id].rimT || '–').join(' / ')}</small>` : '');
   };
   showPaste();
   const copy = (what) => {
     const values = {};
     for (const c of P.CORNERS) {
       const v = what === 'cold' ? t[c.id]?.cold : P.calc(m, s, t, c.id).corrCold;
-      values[c.id] = v == null || v === '' ? '' : what === 'cold' ? String(v) : (Math.round(v * 10) / 10).toFixed(1);
+      values[c.id] = {
+        cold: v == null || v === '' ? '' : what === 'cold' ? String(v) : (Math.round(v * 10) / 10).toFixed(1),
+        rimT: t[c.id]?.rimT ?? '',
+      };
     }
-    if (!Object.values(values).some(Boolean)) { toast(what === 'cold' ? 'No cold set to copy' : 'No corr cold to copy'); return; }
+    if (!Object.values(values).some((x) => x.cold)) { toast(what === 'cold' ? 'No cold set to copy' : 'No corr cold to copy'); return; }
     ui.clip = { values };
     showPaste();
-    toast(`Copied ${what === 'cold' ? 'cold set' : 'corr cold'} from ${tyreLabel(t)}, ${label(m, s)}`);
+    toast(`Copied ${what === 'cold' ? 'cold set' : 'corr cold'} + rim temps from ${tyreLabel(t)}, ${label(m, s)}`);
   };
   document.getElementById('copyCold').onclick = () => copy('cold');
   document.getElementById('copyCorr').onclick = () => copy('corr');
   pasteBtn.onclick = () => {
-    const has = P.CORNERS.some((c) => (t[c.id]?.cold ?? '') !== '');
-    if (has && !confirm(`Replace the cold set on ${tyreLabel(t)}?`)) return;
-    for (const c of P.CORNERS) if (ui.clip.values[c.id]) t[c.id] = { ...(t[c.id] || {}), cold: ui.clip.values[c.id] };
+    const has = P.CORNERS.some((c) => (t[c.id]?.cold ?? '') !== '' || (t[c.id]?.rimT ?? '') !== '');
+    if (has && !confirm(`Replace the cold set and rim temps on ${tyreLabel(t)}?`)) return;
+    for (const c of P.CORNERS) {
+      const v = ui.clip.values[c.id];
+      t[c.id] = { ...(t[c.id] || {}), ...(v.cold ? { cold: v.cold } : {}), ...(v.rimT ? { rimT: v.rimT } : {}) };
+    }
     touch(m); markChip(m, s); renderPressure(m, s);
     toast(`Pasted into ${tyreLabel(t)}`);
   };
