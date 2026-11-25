@@ -555,6 +555,11 @@ function renderPressure(m, s) {
           ${P.CORNERS.map((c) => `<div class="cell out ${c.id === 'rf' ? 'gap' : ''}" data-calc="${k.id}" data-side="${c.id}"></div>`).join('')}
         </div>`).join('')}
     </div>
+    <div class="row">
+      <button id="copyCold" style="flex:1">Copy cold set</button>
+      <button id="copyCorr" style="flex:1">Copy corr cold</button>
+      <button id="pastePress" class="pri" style="flex:1 1 100%" ${ui.clip ? '' : 'hidden'}></button>
+    </div>
     <div class="row"><button id="delTyre" class="sm danger">Delete ${esc(tyreLabel(t))}</button></div>
     <div class="mute">Pressure settings (ref temperature, PSI per °C, ref rise) are in the ••• menu.</div>`;
 
@@ -586,6 +591,35 @@ function renderPressure(m, s) {
     });
     el.addEventListener('focus', () => el.select());
   });
+  // Copy / paste cold pressures between tyres and sessions (kept while the app is open).
+  const pasteBtn = document.getElementById('pastePress');
+  const showPaste = () => {
+    if (!ui.clip) return;
+    pasteBtn.hidden = false;
+    pasteBtn.textContent = `Paste as cold set: ${P.CORNERS.map((c) => ui.clip.values[c.id] || '–').join(' / ')}`;
+  };
+  showPaste();
+  const copy = (what) => {
+    const values = {};
+    for (const c of P.CORNERS) {
+      const v = what === 'cold' ? t[c.id]?.cold : P.calc(m, s, t, c.id).corrCold;
+      values[c.id] = v == null || v === '' ? '' : what === 'cold' ? String(v) : (Math.round(v * 10) / 10).toFixed(1);
+    }
+    if (!Object.values(values).some(Boolean)) { toast(what === 'cold' ? 'No cold set to copy' : 'No corr cold to copy'); return; }
+    ui.clip = { values };
+    showPaste();
+    toast(`Copied ${what === 'cold' ? 'cold set' : 'corr cold'} from ${tyreLabel(t)}, ${label(m, s)}`);
+  };
+  document.getElementById('copyCold').onclick = () => copy('cold');
+  document.getElementById('copyCorr').onclick = () => copy('corr');
+  pasteBtn.onclick = () => {
+    const has = P.CORNERS.some((c) => (t[c.id]?.cold ?? '') !== '');
+    if (has && !confirm(`Replace the cold set on ${tyreLabel(t)}?`)) return;
+    for (const c of P.CORNERS) if (ui.clip.values[c.id]) t[c.id] = { ...(t[c.id] || {}), cold: ui.clip.values[c.id] };
+    touch(m); markChip(m, s); renderPressure(m, s);
+    toast(`Pasted into ${tyreLabel(t)}`);
+  };
+
   document.getElementById('delTyre').onclick = () => {
     if (!confirm(`Delete ${tyreLabel(t)} from this session?`)) return;
     s.tyres = s.tyres.filter((x) => x !== t);
