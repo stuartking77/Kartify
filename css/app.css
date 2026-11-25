@@ -388,3 +388,12 @@ button.fuel-top h3{margin:0}
 button.fuel-top .chev{width:16px;height:12px}
 button.flabel.link{font-weight:400}
 .nowrap .nowrap{white-space:nowrap}
+
+/* Centre every control vertically in its row; buttons the same height as the boxes */
+.wide-ctl{align-items:center}
+.wide-ctl .seg{align-items:center}
+.wide-ctl .seg button{height:32px;display:inline-flex;align-items:center;justify-content:center;padding-top:0;padding-bottom:0}
+.wide-ctl select{height:32px}
+.seg-note,.caster-out{align-self:center;line-height:32px}
+.wide-ctl select{padding:0 6px;min-width:52px;width:auto}
+.frow .cell select{padding:0 6px}
