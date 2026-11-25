@@ -186,3 +186,12 @@ select.inh{color:#7d848e;font-weight:500}
 .times label.info-field input{font-size:16px;font-weight:500;text-align:left;padding:9px 10px;text-transform:none}
 .times input.carried::placeholder{color:#7d848e}
 .grid tr.info-row td{white-space:normal;max-width:180px;min-width:90px;font-size:12px;text-align:left}
+
+/* Compact session info: label beside a short box */
+.card.times{gap:6px;padding:8px 10px}
+.times label.time{flex-direction:row;align-items:center;gap:8px;font-size:11px}
+.times label.time > span{flex:none;width:72px}
+.times label.time:not(.name):not(.info-field) > span{width:auto}
+.times input,.times label.name input,.times label.info-field input{height:32px;padding:4px 8px;font-size:16px;flex:1;min-width:0}
+.times label.name input{font-weight:650;text-align:left}
+.times label.time:not(.name):not(.info-field) input{font-size:16px;font-weight:650;text-align:center}
