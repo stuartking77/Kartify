@@ -34,7 +34,7 @@ export const FIELDS = [
   { id: 'stubPos',      label: 'Stub Pos', kind: 'select', options: ['1', '2', '3', '4', '5'], ref: 'stub', sides: ['f'] },
   { id: 'width',        label: 'Width', kind: 'num', sides: ['f', 'r'] },
   { id: 'wbase',        label: 'Wheelbase', kind: 'choice', options: ['S', 'M', 'L'], sides: ['r'] },
-  { id: 'seatH',        label: 'Seat Height', kind: 'text', wideInput: true, sides: ['r'] },
+  { id: 'seatH',        label: 'Seat Pos', kind: 'text', wideInput: true, sides: ['r'] },
   { id: 'weightDist',   label: 'Weight Dist', kind: 'num', sides: ['r'] },
   { id: 'rideH',        label: 'Ride Height', kind: 'select', options: ['LOW', 'STD', 'HIGH'], sides: ['f', 'r'] },
   { id: 'third',        label: '3rd', kind: 'choice', options: ['IN', 'OUT'], sides: ['r'] },
