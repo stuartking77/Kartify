@@ -675,21 +675,16 @@ function renderPressure(m, s) {
       };
     }
     if (!Object.values(values).some((x) => x.cold)) { toast(what === 'cold' ? 'No cold set to copy' : 'No corr cold to copy'); return; }
-    ui.clip = { values };
+    ui.clip = { values, what: what === 'cold' ? 'cold set' : 'corr cold', from: `${tyreLabel(t)}, ${label(m, s)}`, name: t.name.trim() };
     showPaste();
-    toast(`Copied ${what === 'cold' ? 'cold set' : 'corr cold'} + rim temps from ${tyreLabel(t)}, ${label(m, s)}`);
+    sendClipSheet(m);
   };
   document.getElementById('copyCold').onclick = () => copy('cold');
   document.getElementById('copyCorr').onclick = () => copy('corr');
   pasteBtn.onclick = () => {
     const has = P.CORNERS.some((c) => (t[c.id]?.cold ?? '') !== '' || (t[c.id]?.rimT ?? '') !== '');
     if (has && !confirm(`Replace the cold set and rim temps on ${tyreLabel(t)}?`)) return;
-    for (const c of P.CORNERS) {
-      const v = ui.clip.values[c.id];
-      t[c.id] = { ...(t[c.id] || {}), ...(v.cold ? { cold: v.cold } : {}), ...(v.rimT ? { rimT: v.rimT } : {}) };
-      // remember what the pressure was set at, so changing the rim temp re-corrects it
-      if (v.cold && v.rimT) t[c.id].base = { cold: v.cold, rimT: v.rimT }; else delete t[c.id].base;
-    }
+    applyClip(t, ui.clip);
     touch(m); markChip(m, s); renderPressure(m, s);
     toast(`Pasted into ${tyreLabel(t)}`);
   };
@@ -700,6 +695,48 @@ function renderPressure(m, s) {
     if (!s.tyres.length) s.tyres.push(P.newTyre());
     ui.tyre = null; touch(m); markChip(m, s); renderPressure(m, s);
   };
+}
+
+// Put copied pressures (cold + rim temps) into a tyre.
+function applyClip(t, clip) {
+  for (const c of P.CORNERS) {
+    const v = clip.values[c.id];
+    t[c.id] = { ...(t[c.id] || {}), ...(v.cold ? { cold: v.cold } : {}), ...(v.rimT ? { rimT: v.rimT } : {}) };
+    // remember what the pressure was set at, so changing the rim temp re-corrects it
+    if (v.cold && v.rimT) t[c.id].base = { cold: v.cold, rimT: v.rimT }; else delete t[c.id].base;
+  }
+}
+
+// After copying: send to a new tyre in any session, or keep in the clipboard.
+function sendClipSheet(m) {
+  const clip = ui.clip;
+  const v = clip.values;
+  const d = sheet(`
+    <div class="sheet-body">
+      <h3>Copied ${esc(clip.what)} + rim temps</h3>
+      <div class="mute">From ${esc(clip.from)}<br>
+        Cold ${P.CORNERS.map((c) => esc(v[c.id].cold || '–')).join(' / ')}
+        ${P.CORNERS.some((c) => v[c.id].rimT) ? ` · rim T ${P.CORNERS.map((c) => esc(v[c.id].rimT || '–')).join(' / ')}` : ''}</div>
+      <label class="field">New tyre name<input id="clipName" value="${esc(clip.name)}" placeholder="e.g. Set 2 (scrubbed)" autocapitalize="words"></label>
+      <div class="mute">Send to a new tyre in:</div>
+      <div class="send-list">
+        ${m.sessions.map((x) => `<button data-send="${x.id}" class="${x.id === ui.session ? 'here' : ''}">${esc(label(m, x))}</button>`).join('')}
+      </div>
+      <button data-a="keep" class="pri" autofocus>Keep in clipboard</button>
+    </div>`);
+  d.querySelector('[data-a=keep]').onclick = () => { d.close(); toast('In the clipboard: tap Paste on any tyre'); };
+  d.querySelectorAll('[data-send]').forEach((b) => b.onclick = () => {
+    const target = m.sessions.find((x) => x.id === b.dataset.send);
+    const n = P.newTyre(d.querySelector('#clipName').value.trim());
+    applyClip(n, clip);
+    target.tyres = [...(target.tyres || []), n];
+    d.close();
+    touch(m);
+    ui.session = target.id; ui.tyre = n.id; ui.view = 'pressure';
+    const h = `#/m/${m.id}/${target.id}`;
+    if (location.hash === h) renderMeeting(m); else location.hash = h;
+    toast(`Sent to new tyre in ${label(m, target)}`);
+  });
 }
 
 function openPressureSettings(m) {
