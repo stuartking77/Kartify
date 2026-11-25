@@ -242,3 +242,17 @@ input.small-in{width:90px;text-align:center}
 .send-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
 .send-list button{padding:10px 6px;font-size:14px}
 .send-list button.here{border-color:var(--acc)}
+
+/* Adjust pressures pop-up */
+.adjust-btn{width:100%;margin:10px 0 0;border-color:rgba(52,211,153,.5);color:var(--acc);font-weight:600}
+.adj-rim{display:flex;flex-direction:column;gap:10px}
+.stepper{display:grid;grid-template-columns:48px 1fr 48px;gap:6px}
+.stepper button{padding:0;height:44px;font-size:22px}
+.stepper input{text-align:center;font-size:20px;font-weight:650;height:44px}
+.switch-row{display:flex;align-items:center;gap:10px;border:0;padding:0;justify-content:flex-start;color:var(--text)}
+.switch-row input{width:24px;height:24px;accent-color:var(--acc);flex:none}
+.switch-row small{display:block;color:var(--mute);font-size:12px}
+.adj-preview th,.adj-preview td{text-align:center;padding:6px 2px}
+.adj-preview td:first-child{text-align:left;color:var(--mute)}
+.adj-preview td small{display:block;font-size:11px;color:var(--mute)}
+.adj-preview tr.new td:not(:first-child){color:var(--acc);font-weight:700;font-size:17px}

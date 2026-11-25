@@ -524,8 +524,6 @@ function renderPressure(m, s) {
   ];
   const HINT = { hot: 'came in at', target: 'grey = Setup' };
   const FILL_ALL = ['rimT'];
-  const nudgeKey = `${s.id}:${t.id}`;
-  const nudge = (ui.nudge ||= {})[nudgeKey] ||= { f: 0, r: 0 };
 
   $app.innerHTML = `
     <div class="ptop">
@@ -545,10 +543,12 @@ function renderPressure(m, s) {
       <div class="prow psub"><span></span>${P.CORNERS.map((c) => `<span>${c.label}</span>`).join('')}</div>
       ${P.P_INPUTS.map((p) => `
         <div class="prow">
-          <div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}
-            ${FILL_ALL.includes(p.id) ? `<button class="fill-all" data-fill="${p.id}">Copy to all</button>` : ''}</div>
+          ${p.id === 'cold'
+            ? `<button class="flabel ref" data-adjust>${p.label} <span class="go">›</span><div class="hint">tap to adjust</div></button>`
+            : `<div class="flabel">${p.label}${HINT[p.id] ? `<div class="hint">${HINT[p.id]}</div>` : ''}
+            ${FILL_ALL.includes(p.id) ? `<button class="fill-all" data-fill="${p.id}">Copy to all</button>` : ''}</div>`}
           ${P.CORNERS.map((c) => `
-            <div class="cell ${c.id === 'rf' ? 'gap' : ''}"><input class="${p.id === 'cold' && t[c.id]?.base ? 'tracks' : ''}" data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
+            <div class="cell ${c.id === 'rf' ? 'gap' : ''}"><input data-p="${p.id}" data-side="${c.id}" value="${esc(t[c.id]?.[p.id] ?? '')}"
               placeholder="${esc(p.id === 'target' ? P.carriedTarget(m, s, t, c.id) : '')}" inputmode="decimal" autocomplete="off"
               aria-label="${p.label} ${c.id.toUpperCase()}"></div>`).join('')}
         </div>`).join('')}
@@ -559,19 +559,7 @@ function renderPressure(m, s) {
           ${P.CORNERS.map((c) => `<div class="cell out ${c.id === 'rf' ? 'gap' : ''}" data-calc="${k.id}" data-side="${c.id}"></div>`).join('')}
         </div>`).join('')}
     </div>
-    <div class="card nudge">
-      <h3>Adjust cold set</h3>
-      <div class="nudge-row">
-        ${[['f', 'Front'], ['r', 'Rear']].map(([ax, name]) => `
-          <div class="nudge-axle">
-            <span>${name}</span>
-            <button data-nudge="${ax}" data-d="-1" aria-label="${name} minus 0.1">−</button>
-            <b id="nd-${ax}"></b>
-            <button data-nudge="${ax}" data-d="1" aria-label="${name} plus 0.1">+</button>
-          </div>`).join('')}
-      </div>
-      <div class="mute">0.1 psi per tap, both tyres on that axle.${P.CORNERS.some((c) => t[c.id]?.base) ? ' Green dashed cold sets follow the rim temp.' : ''}</div>
-    </div>
+    <button id="adjustBtn" class="adjust-btn" data-adjust>Adjust pressures &amp; rim temp</button>
     <div class="row">
       <button id="copyCold" style="flex:1">Copy cold set</button>
       <button id="copyCorr" style="flex:1">Copy corr cold</button>
@@ -601,35 +589,11 @@ function renderPressure(m, s) {
     $app.querySelector(`[data-t="${t.id}"]`).textContent = tyreLabel(t);
   });
   const coldInput = (c) => $app.querySelector(`input[data-p="cold"][data-side="${c}"]`);
-  const retempCorner = (c) => { if (P.retemp(m, t[c])) coldInput(c).value = t[c].cold; };
-
-  // Front / rear nudge: move both cold pressures on an axle by 0.1 psi per tap.
-  const showNudge = () => {
-    for (const ax of ['f', 'r']) {
-      const v = Math.round(nudge[ax] * 10) / 10;
-      document.getElementById(`nd-${ax}`).textContent = (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1);
-    }
-  };
-  showNudge();
-  $app.querySelectorAll('[data-nudge]').forEach((b) => b.onclick = () => {
-    const ax = b.dataset.nudge, d = Number(b.dataset.d) / 10;
-    const corners = P.CORNERS.filter((c) => c.axle === ax && (t[c.id]?.cold ?? '') !== '');
-    if (!corners.length) { toast('Set a cold pressure first'); return; }
-    for (const c of corners) {
-      const v = t[c.id];
-      if (v.base) { v.base.cold = P.tidy(Number(v.base.cold) + d); if (!P.retemp(m, v)) v.cold = P.tidy(Number(v.cold) + d); }
-      else v.cold = P.tidy(Number(v.cold) + d);
-      coldInput(c.id).value = v.cold;
-    }
-    nudge[ax] += d;
-    showNudge(); touch(m); updateCalc();
-  });
+  $app.querySelectorAll('[data-adjust]').forEach((b) => b.onclick = () => adjustSheet(m, s, t));
 
   $app.querySelectorAll('input[data-p]').forEach((el) => {
     el.addEventListener('input', () => {
       t[el.dataset.side] = { ...(t[el.dataset.side] || {}), [el.dataset.p]: el.value.trim() };
-      if (el.dataset.p === 'rimT') retempCorner(el.dataset.side);
-      if (el.dataset.p === 'cold') { delete t[el.dataset.side].base; el.classList.remove('tracks'); }
       ui.lastCorner = { [el.dataset.p]: el.dataset.side, ...(ui.lastCorner || {}), [el.dataset.p]: el.dataset.side };
       touch(m); markChip(m, s); updateCalc();
       $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
@@ -648,7 +612,6 @@ function renderPressure(m, s) {
       for (const c of P.CORNERS) {
         t[c.id] = { ...(t[c.id] || {}), [id]: v };
         $app.querySelector(`input[data-p="${id}"][data-side="${c.id}"]`).value = v;
-        if (id === 'rimT') retempCorner(c.id);
       }
       touch(m); markChip(m, s); updateCalc();
       $app.querySelector(`[data-t="${t.id}"]`).classList.toggle('has', P.tyreHasData(t));
@@ -702,8 +665,6 @@ function applyClip(t, clip) {
   for (const c of P.CORNERS) {
     const v = clip.values[c.id];
     t[c.id] = { ...(t[c.id] || {}), ...(v.cold ? { cold: v.cold } : {}), ...(v.rimT ? { rimT: v.rimT } : {}) };
-    // remember what the pressure was set at, so changing the rim temp re-corrects it
-    if (v.cold && v.rimT) t[c.id].base = { cold: v.cold, rimT: v.rimT }; else delete t[c.id].base;
   }
 }
 
@@ -736,6 +697,87 @@ function sendClipSheet(m) {
     const h = `#/m/${m.id}/${target.id}`;
     if (location.hash === h) renderMeeting(m); else location.hash = h;
     toast(`Sent to new tyre in ${label(m, target)}`);
+  });
+}
+
+// Adjust a tyre's cold set in one go: new rim temp (optionally compensating the cold
+// pressures for the temperature change) and front / rear offsets, with a live preview.
+function adjustSheet(m, s, t) {
+  const psi = Number(P.settingsOf(m).psiPerDeg);
+  const n = (v) => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
+  const rims = P.CORNERS.map((c) => t[c.id]?.rimT ?? '').filter((v) => v !== '');
+  const st = { rim: rims.length && rims.every((v) => v === rims[0]) ? rims[0] : '', comp: true, off: { f: 0, r: 0 } };
+
+  const result = (c) => {
+    const cold = n(t[c.id]?.cold);
+    if (cold == null) return null;
+    let v = cold;
+    const from = n(t[c.id]?.rimT), to = n(st.rim);
+    if (st.comp && from != null && to != null) v += (to - from) * psi;
+    return v + st.off[c.axle];
+  };
+
+  const d = sheet(`
+    <form method="dialog" class="sheet-body adjust">
+      <h3>Adjust ${esc(t.name.trim() || 'tyre')} · ${esc(label(m, s))}</h3>
+      <div class="adj-rim">
+        <label class="field">New rim temp (all tyres, °C)
+          <div class="stepper"><button type="button" data-rim="-1">−</button>
+            <input id="adjRim" value="${esc(st.rim)}" inputmode="decimal" placeholder="unchanged">
+            <button type="button" data-rim="1">+</button></div></label>
+        <label class="switch-row"><input type="checkbox" id="adjComp" checked>
+          <span>Temp compensation<small>cold pressure changes ${psi} psi per °C</small></span></label>
+      </div>
+      <div class="nudge-row">
+        ${[['f', 'Front'], ['r', 'Rear']].map(([ax, name]) => `
+          <div class="nudge-axle">
+            <span>${name}</span>
+            <button type="button" data-off="${ax}" data-d="-1" aria-label="${name} minus 0.1">−</button>
+            <b id="off-${ax}"></b>
+            <button type="button" data-off="${ax}" data-d="1" aria-label="${name} plus 0.1">+</button>
+          </div>`).join('')}
+      </div>
+      <table class="adj-preview">
+        <tr><th></th><th>LF</th><th>RF</th><th>LR</th><th>RR</th></tr>
+        <tr><td>Now</td>${P.CORNERS.map((c) => `<td>${esc(t[c.id]?.cold || '–')}<small>${t[c.id]?.rimT ? esc(t[c.id].rimT) + '°' : ''}</small></td>`).join('')}</tr>
+        <tr class="new"><td>New</td>${P.CORNERS.map((c) => `<td data-new="${c.id}"></td>`).join('')}</tr>
+      </table>
+      <div class="row">
+        <button type="button" data-a="cancel" style="flex:1">Cancel</button>
+        <button class="pri" value="apply" style="flex:2">Apply</button>
+      </div>
+    </form>`);
+
+  const rimIn = d.querySelector('#adjRim');
+  const show = () => {
+    for (const ax of ['f', 'r']) {
+      const v = Math.round(st.off[ax] * 10) / 10;
+      d.querySelector(`#off-${ax}`).textContent = (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1);
+    }
+    for (const c of P.CORNERS) {
+      const v = result(c);
+      d.querySelector(`[data-new="${c.id}"]`).innerHTML =
+        (v == null ? '–' : P.tidy(v)) + `<small>${st.rim !== '' ? esc(st.rim) + '°' : t[c.id]?.rimT ? esc(t[c.id].rimT) + '°' : ''}</small>`;
+    }
+  };
+  show();
+  rimIn.addEventListener('input', () => { st.rim = rimIn.value.trim(); show(); });
+  d.querySelectorAll('[data-rim]').forEach((b) => b.onclick = () => {
+    const base = n(st.rim) ?? n(rims[0]) ?? 0;
+    st.rim = P.tidy(base + Number(b.dataset.rim)); rimIn.value = st.rim; show();
+  });
+  d.querySelector('#adjComp').onchange = (e) => { st.comp = e.target.checked; show(); };
+  d.querySelectorAll('[data-off]').forEach((b) => b.onclick = () => { st.off[b.dataset.off] += Number(b.dataset.d) / 10; show(); });
+  d.querySelector('[data-a=cancel]').onclick = () => d.close();
+  d.querySelector('form').addEventListener('submit', () => {
+    for (const c of P.CORNERS) {
+      const v = result(c);
+      t[c.id] = { ...(t[c.id] || {}) };
+      if (v != null) t[c.id].cold = P.tidy(v);
+      if (st.rim !== '' && n(st.rim) != null) t[c.id].rimT = st.rim;
+    }
+    touch(m); markChip(m, s); renderPressure(m, s);
+    toast('Pressures adjusted');
   });
 }
 
