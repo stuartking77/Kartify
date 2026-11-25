@@ -705,14 +705,20 @@ function sendClipSheet(m) {
 function adjustSheet(m, s, t) {
   const psi = Number(P.settingsOf(m).psiPerDeg);
   const n = (v) => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
-  const rims = P.CORNERS.map((c) => t[c.id]?.rimT ?? '').filter((v) => v !== '');
-  const st = { rim: rims.length && rims.every((v) => v === rims[0]) ? rims[0] : '', comp: true, off: { f: 0, r: 0 } };
+  const nowRim = (c) => t[c.id]?.rimT ?? '';
+  const rims = P.CORNERS.map(nowRim).filter((v) => v !== '');
+  // New rim temp per tyre (starts at the current one); the "all tyres" box sets all four.
+  const st = {
+    all: rims.length && rims.every((v) => v === rims[0]) ? rims[0] : '',
+    rim: Object.fromEntries(P.CORNERS.map((c) => [c.id, nowRim(c)])),
+    comp: true, off: { f: 0, r: 0 },
+  };
 
   const result = (c) => {
     const cold = n(t[c.id]?.cold);
     if (cold == null) return null;
     let v = cold;
-    const from = n(t[c.id]?.rimT), to = n(st.rim);
+    const from = n(nowRim(c)), to = n(st.rim[c.id]);
     if (st.comp && from != null && to != null) v += (to - from) * psi;
     return v + st.off[c.axle];
   };
@@ -721,9 +727,9 @@ function adjustSheet(m, s, t) {
     <form method="dialog" class="sheet-body adjust">
       <h3>Adjust ${esc(t.name.trim() || `Tyre ${s.tyres.indexOf(t) + 1}`)} · ${esc(label(m, s))}</h3>
       <div class="adj-rim">
-        <label class="field">New rim temp (all tyres, °C)
+        <label class="field">New rim temp, all tyres (°C)
           <div class="stepper"><button type="button" data-rim="-1">−</button>
-            <input id="adjRim" value="${esc(st.rim)}" inputmode="decimal" placeholder="unchanged">
+            <input id="adjRim" value="${esc(st.all)}" inputmode="decimal" placeholder="–">
             <button type="button" data-rim="1">+</button></div></label>
         <label class="switch-row"><input type="checkbox" id="adjComp" checked>
           <span>Temp compensation<small>cold pressure changes ${psi} psi per °C</small></span></label>
@@ -739,8 +745,9 @@ function adjustSheet(m, s, t) {
       </div>
       <table class="adj-preview">
         <tr><th></th><th>LF</th><th>RF</th><th>LR</th><th>RR</th></tr>
-        <tr><td>Now</td>${P.CORNERS.map((c) => `<td>${esc(t[c.id]?.cold || '–')}<small>${t[c.id]?.rimT ? esc(t[c.id].rimT) + '°' : ''}</small></td>`).join('')}</tr>
-        <tr class="new"><td>New</td>${P.CORNERS.map((c) => `<td data-new="${c.id}"></td>`).join('')}</tr>
+        <tr><td>Now</td>${P.CORNERS.map((c) => `<td>${esc(t[c.id]?.cold || '–')}<small>${nowRim(c) ? esc(nowRim(c)) + '°' : ''}</small></td>`).join('')}</tr>
+        <tr class="rim-row"><td>New rim °C</td>${P.CORNERS.map((c) => `<td><input data-rimc="${c.id}" value="${esc(st.rim[c.id])}" inputmode="decimal" placeholder="–" aria-label="New rim temp ${c.id.toUpperCase()}"></td>`).join('')}</tr>
+        <tr class="new"><td>New cold</td>${P.CORNERS.map((c) => `<td data-new="${c.id}"></td>`).join('')}</tr>
       </table>
       <div class="row">
         <button type="button" data-a="cancel" style="flex:1">Cancel</button>
@@ -756,15 +763,24 @@ function adjustSheet(m, s, t) {
     }
     for (const c of P.CORNERS) {
       const v = result(c);
-      d.querySelector(`[data-new="${c.id}"]`).innerHTML =
-        (v == null ? '–' : P.tidy(v)) + `<small>${st.rim !== '' ? esc(st.rim) + '°' : t[c.id]?.rimT ? esc(t[c.id].rimT) + '°' : ''}</small>`;
+      d.querySelector(`[data-new="${c.id}"]`).textContent = v == null ? '–' : P.tidy(v);
     }
   };
+  const setAll = (v) => {
+    st.all = v;
+    for (const c of P.CORNERS) { st.rim[c.id] = v; d.querySelector(`[data-rimc="${c.id}"]`).value = v; }
+    show();
+  };
   show();
-  rimIn.addEventListener('input', () => { st.rim = rimIn.value.trim(); show(); });
+  rimIn.addEventListener('input', () => { if (n(rimIn.value.trim()) != null) setAll(rimIn.value.trim()); });
   d.querySelectorAll('[data-rim]').forEach((b) => b.onclick = () => {
-    const base = n(st.rim) ?? n(rims[0]) ?? 0;
-    st.rim = P.tidy(base + Number(b.dataset.rim)); rimIn.value = st.rim; show();
+    const base = n(st.all) ?? n(rims[0]) ?? 0;
+    const v = P.tidy(base + Number(b.dataset.rim));
+    rimIn.value = v; setAll(v);
+  });
+  d.querySelectorAll('[data-rimc]').forEach((el) => {
+    el.addEventListener('input', () => { st.rim[el.dataset.rimc] = el.value.trim(); show(); });
+    el.addEventListener('focus', () => el.select());
   });
   d.querySelector('#adjComp').onchange = (e) => { st.comp = e.target.checked; show(); };
   d.querySelectorAll('[data-off]').forEach((b) => b.onclick = () => { st.off[b.dataset.off] += Number(b.dataset.d) / 10; show(); });
@@ -774,7 +790,7 @@ function adjustSheet(m, s, t) {
       const v = result(c);
       t[c.id] = { ...(t[c.id] || {}) };
       if (v != null) t[c.id].cold = P.tidy(v);
-      if (st.rim !== '' && n(st.rim) != null) t[c.id].rimT = st.rim;
+      if (n(st.rim[c.id]) != null) t[c.id].rimT = st.rim[c.id];
     }
     touch(m); markChip(m, s); renderPressure(m, s);
     toast('Pressures adjusted');

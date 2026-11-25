@@ -24,7 +24,7 @@ full screen and works offline at the track.
   PSI per °C, ref temperature and the generic ref rise are set once per event (••• → Pressure settings).
   *Copy cold set* / *Copy corr cold* sends them to a new tyre in any session, or keeps them in the
   clipboard where *Paste* puts those pressures and their rim temps into another tyre or session.
-  Tap *Cold set ›* (or *Adjust pressures & rim temp*) for a pop-up: set a new rim temp for all tyres
+  Tap *Cold set ›* (or *Adjust pressures & rim temp*) for a pop-up: set a new rim temp for all tyres or each tyre
   with or without temp compensation (psi per °C), nudge front and/or rear by 0.1 psi, preview, apply.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
   "New event from this setup" starts the next event.
