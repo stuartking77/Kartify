@@ -397,3 +397,4 @@ button.flabel.link{font-weight:400}
 .seg-note,.caster-out{align-self:center;line-height:32px}
 .wide-ctl select{padding:0 6px;min-width:52px;width:auto}
 .frow .cell select{padding:0 6px}
+.sheet-body .tank{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:4px}

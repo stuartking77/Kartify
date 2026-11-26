@@ -1153,16 +1153,7 @@ function renderFuel(m, s) {
       ${row('mm → litres', `<input id="cvMm" inputmode="decimal" placeholder="mm" autocomplete="off"><span class="fuel-l" id="cvL"></span>`)}
       ${row('litres → mm', `<input id="cvL2" inputmode="decimal" placeholder="L" autocomplete="off"><span class="fuel-l" id="cvMm2"></span>`)}
     </div>
-    <div class="card fuel tank">
-      <h3>Tank table <span class="mute">· all events</span></h3>
-      <div class="tank-head"><span>Dipstick mm</span><span>Litres</span><span></span></div>
-      <div id="tankRows"></div>
-      <div class="row">
-        <button id="addTankRow" style="flex:1">+ Add row</button>
-        <button id="resetTank" class="sm">Reset to default</button>
-      </div>
-    </div>
-    <div class="mute">Min weight, margin and fuel density are in ••• → Fuel settings.</div>`;
+    <div class="mute">Tank table, min weight, margin and fuel density are in ••• → Fuel settings.</div>`;
 
   const show = (c) => {
     const set = (k, v) => { const el = $app.querySelector(`[data-out="${k}"]`); if (el) el.textContent = v; };
@@ -1193,20 +1184,38 @@ function renderFuel(m, s) {
   cv(document.getElementById('cvL2'), document.getElementById('cvMm2'), F.mmFromLitres, 'mm', 0);
   document.getElementById('toSetup').onclick = () => { ui.view = 'session'; renderMeeting(m); window.scrollTo(0, 0); };
 
-  // Tank table: edit in place, saved as you type, used by every event.
+}
+
+function openFuelSettings(m) {
+  const st = F.fuelSettings(m);
   if (!state.tank) state.tank = F.FUEL_DEFAULTS.table.map((r) => r.map(String));
-  const rowsEl = document.getElementById('tankRows');
-  const saveTank = () => {
-    F.setTankTable(state.tank);
-    store.save(state);
-    show(F.fuelCalc(m, s));
-  };
+  const d = sheet(`
+    <form method="dialog" class="sheet-body">
+      <h3>Fuel settings</h3>
+      <label class="field">Min weight (kg) – this event<input name="minWeight" value="${esc(st.minWeight)}" inputmode="decimal"></label>
+      <label class="field">Margin (kg above min weight) – this event<input name="margin" value="${esc(st.margin)}" inputmode="decimal"></label>
+      <label class="field">Fuel density (kg per litre) – this event<input name="density" value="${esc(st.density)}" inputmode="decimal"></label>
+      <div class="tank">
+        <h3>Tank table <span class="mute">· all events</span></h3>
+        <div class="tank-head"><span>Dipstick mm</span><span>Litres</span><span></span></div>
+        <div id="tankRows"></div>
+        <div class="row">
+          <button type="button" id="addTankRow" style="flex:1">+ Add row</button>
+          <button type="button" id="resetTank" class="sm">Reset to default</button>
+        </div>
+      </div>
+      <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
+    </form>`);
+
+  // Tank table: saved as you type, shared by every event.
+  const rowsEl = d.querySelector('#tankRows');
+  const saveTank = () => { F.setTankTable(state.tank); store.save(state); };
   const drawTank = () => {
     rowsEl.innerHTML = state.tank.map(([mm, l], i) => `
       <div class="tank-row">
         <input data-tank="${i}:0" value="${esc(mm)}" inputmode="decimal" placeholder="mm" aria-label="Row ${i + 1} mm">
         <input data-tank="${i}:1" value="${esc(l)}" inputmode="decimal" placeholder="L" aria-label="Row ${i + 1} litres">
-        <button class="sm" data-del-tank="${i}" aria-label="Delete row ${i + 1}">✕</button>
+        <button type="button" class="sm" data-del-tank="${i}" aria-label="Delete row ${i + 1}">✕</button>
       </div>`).join('');
     rowsEl.querySelectorAll('[data-tank]').forEach((el) => {
       el.addEventListener('input', () => {
@@ -1222,29 +1231,19 @@ function renderFuel(m, s) {
     });
   };
   drawTank();
-  document.getElementById('addTankRow').onclick = () => {
+  d.querySelector('#addTankRow').onclick = () => {
     state.tank.push(['', '']);
     drawTank();
     rowsEl.querySelector(`[data-tank="${state.tank.length - 1}:0"]`).focus();
   };
-  document.getElementById('resetTank').onclick = () => {
+  d.querySelector('#resetTank').onclick = () => {
     if (!confirm('Put the tank table back to the original values from the spreadsheet?')) return;
     state.tank = F.FUEL_DEFAULTS.table.map((r) => r.map(String));
     saveTank(); drawTank();
   };
-}
+  // Closing (Done, or tapping outside) keeps the table; re-draw so fuel figures use it.
+  d.addEventListener('close', () => { if (d.returnValue !== 'save') renderMeeting(m); });
 
-function openFuelSettings(m) {
-  const st = F.fuelSettings(m);
-  const d = sheet(`
-    <form method="dialog" class="sheet-body">
-      <h3>Fuel settings (this event)</h3>
-      <label class="field">Min weight (kg)<input name="minWeight" value="${esc(st.minWeight)}" inputmode="decimal"></label>
-      <label class="field">Margin (kg above min weight)<input name="margin" value="${esc(st.margin)}" inputmode="decimal"></label>
-      <label class="field">Fuel density (kg per litre)<input name="density" value="${esc(st.density)}" inputmode="decimal"></label>
-      <div class="mute">The tank table (dipstick mm = litres) is on the Fuel page and is shared by all events.</div>
-      <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
-    </form>`);
   d.querySelector('form').addEventListener('submit', () => {
     const fd = new FormData(d.querySelector('form'));
     const fuel = {};

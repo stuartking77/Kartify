@@ -29,9 +29,9 @@ full screen and works offline at the track.
   Adjusted boxes get an amber dot; *Revert adjustment* puts them back. Hot pressure boxes are red.
 - **Fuel**: Fuel start / end (dipstick mm, shown in litres) sit above Save setup; tap either for the
   fuel page: used, used/min, fuel needed for the next session, weight delta and fuel for weight,
-  uplift, and the dipstick mm to fill to, plus a mm ↔ litres converter. The tank table (dipstick
-  mm = litres) is edited at the bottom of the fuel page and shared by all events; min weight,
-  margin and fuel density are per event in ••• → Fuel settings.
+  uplift, and the dipstick mm to fill to, plus a mm ↔ litres converter. ••• → Fuel settings holds the
+  tank table (dipstick mm = litres, shared by all events) and the per-event min weight, margin and
+  fuel density.
 - **Voice notes**: the 🎤 by Notes opens the box for the iPhone keyboard's dictation (mic key), which
   works in any box.
 - **Save / load setups**: save a session's setup by name and load it into any session later.
