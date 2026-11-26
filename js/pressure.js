@@ -25,8 +25,12 @@ const axleOf = (corner) => CORNERS.find((c) => c.id === corner).axle;
 
 export function settingsOf(m) {
   const p = { ...(m.pressure || {}) };
-  // Older events had one ref rise for both axles.
-  if (p.refRise != null) { p.refRiseF ??= p.refRise; p.refRiseR ??= p.refRise; delete p.refRise; }
+  // Older events had one ref rise for both axles. Saving those settings stored the 1.1 default,
+  // so only carry it over if it was changed from that.
+  if (p.refRise != null) {
+    if (Number(p.refRise) !== 1.1) { p.refRiseF ??= p.refRise; p.refRiseR ??= p.refRise; }
+    delete p.refRise;
+  }
   return { ...PRESSURE_DEFAULTS, ...p };
 }
 
