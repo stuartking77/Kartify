@@ -909,14 +909,17 @@ function openPressureSettings(m) {
         <input name="refTemp" value="${esc(st.refTemp)}" inputmode="decimal"></label>
       <label class="field">PSI per °C rim temp
         <input name="psiPerDeg" value="${esc(st.psiPerDeg)}" inputmode="decimal"></label>
-      <label class="field">Ref rise (generic) – Rise coeff compares each tyre's hot/cold rise with this (1.1 = 10%)
-        <input name="refRise" value="${esc(st.refRise)}" inputmode="decimal"></label>
+      <div class="field">Ref rise – Rise Coeff compares each tyre's hot/cold rise with this (1.1 = 10%)
+        <div class="two-in">
+          <label>Front<input name="refRiseF" value="${esc(st.refRiseF)}" inputmode="decimal"></label>
+          <label>Rear<input name="refRiseR" value="${esc(st.refRiseR)}" inputmode="decimal"></label>
+        </div></div>
       <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
     </form>`);
   d.querySelector('form').addEventListener('submit', () => {
     const fd = new FormData(d.querySelector('form'));
     m.pressure = {};
-    for (const k of ['refTemp', 'psiPerDeg', 'refRise']) {
+    for (const k of ['refTemp', 'psiPerDeg', 'refRiseF', 'refRiseR']) {
       const v = String(fd.get(k)).trim();
       if (v !== '' && !isNaN(Number(v))) m.pressure[k] = v;
     }

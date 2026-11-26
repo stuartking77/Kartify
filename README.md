@@ -21,7 +21,7 @@ full screen and works offline at the track.
 - **Tyre pressures**: tap *Target hot* in a session to open its pressure page. One tab per tyre run
   that session (+ Tyre to add more), four corners (Front L/R, Rear L/R): Rim T (green), Cold set (blue), Hot pressure (red, what they came in at) and
   a front/rear New target in (Corr uses New target, or the Setup's target when blank; the Setup target is shown too); Ref @ ref temp, Rise coeff, Corr delta and Corr cold out.
-  PSI per °C, ref temperature and the generic ref rise are set once per event (••• → Pressure settings).
+  PSI per °C, ref temperature and the ref rise (front 1.1, rear 1.15) are set once per event (••• → Pressure settings).
   *Copy cold set* / *Copy corr cold* sends them (with rim temps and New target) to any session (into that tyre if it's already there, else a new tyre), or keeps them in the
   clipboard where *Paste* puts those pressures and their rim temps into another tyre or session.
   Tap *Cold set ›* (or *Adjust pressures & rim temp*) for a pop-up: set a new rim temp for all tyres or each tyre

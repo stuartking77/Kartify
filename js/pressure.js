@@ -2,10 +2,11 @@
 // Each session can have several tyres (tabs); each tyre has Front and Rear values.
 
 // psiPerDeg: pressure change per °C of rim temperature. refTemp: temperature REF is quoted at.
-// refRise: the generic hot/cold rise (absolute pressure) that Rise coeff is compared against.
+// refRiseF / refRiseR: the generic hot/cold rise (absolute pressure) Rise Coeff is compared
+// against, front and rear (the sheet's 1.1 and 1.15).
 import { effectiveValues } from './store.js';
 
-export const PRESSURE_DEFAULTS = { psiPerDeg: 0.1, refTemp: 5, refRise: 1.1 };
+export const PRESSURE_DEFAULTS = { psiPerDeg: 0.1, refTemp: 5, refRiseF: 1.1, refRiseR: 1.15 };
 const ATM = 14.5; // psi, to work in absolute pressure
 
 export const P_INPUTS = [
@@ -23,7 +24,10 @@ export const CORNERS = [
 const axleOf = (corner) => CORNERS.find((c) => c.id === corner).axle;
 
 export function settingsOf(m) {
-  return { ...PRESSURE_DEFAULTS, ...(m.pressure || {}) };
+  const p = { ...(m.pressure || {}) };
+  // Older events had one ref rise for both axles.
+  if (p.refRise != null) { p.refRiseF ??= p.refRise; p.refRiseR ??= p.refRise; delete p.refRise; }
+  return { ...PRESSURE_DEFAULTS, ...p };
 }
 
 export function newTyre(name = '') {
@@ -70,7 +74,8 @@ export function calc(m, s, t, side) {
   const v = t[side] || {};
   const rimT = num(v.rimT), K = num(v.cold), Q = num(v.hot);
   const W = num(t.targets?.[axleOf(side)] ?? '') ?? num(carriedTarget(m, s, t, side));
-  const rise = num(st.refRise) ?? PRESSURE_DEFAULTS.refRise;
+  const axle = axleOf(side);
+  const rise = num(axle === 'f' ? st.refRiseF : st.refRiseR) ?? PRESSURE_DEFAULTS[axle === 'f' ? 'refRiseF' : 'refRiseR'];
   const out = { ref: null, riseCoeff: null, corrDelta: null, corrCold: null, target: W };
   if (rimT != null && K != null) out.ref = (st.refTemp - rimT) * st.psiPerDeg + K;
   if (Q != null && K != null) out.riseCoeff = ((Q + ATM) / (K + ATM)) / rise;
