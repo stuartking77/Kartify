@@ -6,7 +6,8 @@ full screen and works offline at the track.
 
 ## What it does (Setup tab)
 
-- **Events**: one per race meeting or test day (track, date, class).
+- **Events**: one per race meeting or test day (circuit, date, kart type, driver). The Events screen has
+  a search box, Kart type / Circuit / Driver filters and a Recent list of the last 3 events opened.
 - **Sessions**: each event starts with 7 blank, numbered session tabs (add more with **+**). Name a
   session (e.g. "Test 1") and only the next tab defaults to "Test 2" until you type over it.
 - **Session info** at the top of each session: tyre (carries forward), a short comment, lap time and ref time. All show in the Grid.

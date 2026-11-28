@@ -35,6 +35,8 @@ function route() {
     if (!m) { location.hash = '#/'; return; }
     if (parts[2] && m.sessions.some((s) => s.id === parts[2])) ui.session = parts[2];
     if (!m.sessions.some((s) => s.id === ui.session)) ui.session = m.sessions[0].id;
+    m.openedAt = Date.now();
+    store.save(state);
     renderMeeting(m);
   } else {
     renderHome();
@@ -54,26 +56,55 @@ function openSession(m, sid) {
 }
 
 // ---------- Home ----------
+// Event subtitle: date · kart type · driver
+const eventSub = (m) => [fmtDate(m.date), m.kartClass, m.driver].filter(Boolean).join(' · ');
+
+// Distinct values used across events, for the filters and suggestions.
+const FILTER_KEYS = { kart: 'kartClass', track: 'track', driver: 'driver' };
+function distinct(key) {
+  const f = FILTER_KEYS[key];
+  const seen = new Map();
+  for (const m of state.meetings) {
+    const v = (m[f] || '').trim();
+    if (v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
+function eventCardHTML(m) {
+  const used = m.sessions.filter((s) => store.sessionHasData(s));
+  return `
+    <a class="card event" href="#/m/${m.id}">
+      <div class="ev-title">${esc(m.track) || '<span class="mute">Untitled event</span>'}</div>
+      <div class="mute">${esc(eventSub(m))}</div>
+      ${used.length ? `<div class="pips">${used.map((s) => `<span class="pill on">${esc(label(m, s))}</span>`).join('')}</div>` : ''}
+    </a>`;
+}
+
 function renderHome() {
   $hdr.innerHTML = `${LOGO}<h1>KARTIFY</h1><button id="new" class="pri sm">+ New event</button>`;
   $nav.className = ''; $nav.innerHTML = '';
-  const meetings = [...state.meetings].sort((a, b) =>
-    (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+  const fl = (ui.filter ||= { q: '', kart: '', track: '', driver: '' });
+  const has = state.meetings.length > 0;
 
   $app.innerHTML = `
-    ${meetings.length === 0 ? `
+    ${!has ? `
       <div class="card empty">
         <h3>No events yet</h3>
         <p class="mute">Create one for each race meeting or test day, then fill in the setup for each session.</p>
-      </div>` : meetings.map((m) => {
-        const used = m.sessions.filter((s) => store.sessionHasData(s));
-        return `
-        <a class="card event" href="#/m/${m.id}">
-          <div class="ev-title">${esc(m.track) || '<span class="mute">Untitled event</span>'}</div>
-          <div class="mute">${esc(fmtDate(m.date))}${m.kartClass ? ' · ' + esc(m.kartClass) : ''}</div>
-          ${used.length ? `<div class="pips">${used.map((s) => `<span class="pill on">${esc(label(m, s))}</span>`).join('')}</div>` : ''}
-        </a>`;
-      }).join('')}
+      </div>` : `
+      <div class="card search">
+        <input id="q" type="search" value="${esc(fl.q)}" placeholder="Search events" autocomplete="off" aria-label="Search events">
+        <div class="filters">
+          ${[['kart', 'Kart type', 'All karts'], ['track', 'Circuit', 'All circuits'], ['driver', 'Driver', 'All drivers']].map(([k, name, all]) => `
+            <select data-filter="${k}" aria-label="${name}" class="${fl[k] ? 'on' : ''}">
+              <option value="">${all}</option>
+              ${distinct(k).map((v) => `<option value="${esc(v)}" ${v === fl[k] ? 'selected' : ''}>${esc(v)}</option>`).join('')}
+            </select>`).join('')}
+        </div>
+        <button id="clearFilters" class="sm link-btn" ${fl.q || fl.kart || fl.track || fl.driver ? '' : 'hidden'}>Clear</button>
+      </div>
+      <div id="eventLists"></div>`}
     ${state.setups.length ? `
     <div class="card">
       <h3>Saved setups</h3>
@@ -92,6 +123,36 @@ function renderHome() {
         <input type="file" id="import" accept="application/json,.json" hidden>
       </div>
     </div>`;
+
+  // Recent (last opened) + all events matching the search and filters.
+  const drawLists = () => {
+    const el = document.getElementById('eventLists');
+    if (!el) return;
+    const q = fl.q.trim().toLowerCase();
+    const active = q || fl.kart || fl.track || fl.driver;
+    const eq = (a, b) => (a || '').trim().toLowerCase() === b.toLowerCase();
+    const match = (m) => (!fl.kart || eq(m.kartClass, fl.kart)) && (!fl.track || eq(m.track, fl.track))
+      && (!fl.driver || eq(m.driver, fl.driver))
+      && (!q || [m.track, m.kartClass, m.driver, m.date, fmtDate(m.date)].some((v) => (v || '').toLowerCase().includes(q)));
+    const all = state.meetings.filter(match)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt);
+    const recent = active ? [] : [...state.meetings].filter((m) => m.openedAt)
+      .sort((a, b) => b.openedAt - a.openedAt).slice(0, 3);
+    el.innerHTML = `
+      ${recent.length ? `<h2 class="list-h">Recent</h2>${recent.map(eventCardHTML).join('')}` : ''}
+      <h2 class="list-h">${active ? `${all.length} matching event${all.length === 1 ? '' : 's'}` : 'All events'}</h2>
+      ${all.length ? all.map(eventCardHTML).join('') : '<div class="card"><div class="mute">No events match.</div></div>'}`;
+    const clr = document.getElementById('clearFilters');
+    if (clr) clr.hidden = !active;
+  };
+  drawLists();
+  document.getElementById('q')?.addEventListener('input', (e) => { fl.q = e.target.value; drawLists(); });
+  $app.querySelectorAll('[data-filter]').forEach((sel) => sel.onchange = () => {
+    fl[sel.dataset.filter] = sel.value; sel.classList.toggle('on', !!sel.value); drawLists();
+  });
+  document.getElementById('clearFilters')?.addEventListener('click', () => {
+    ui.filter = { q: '', kart: '', track: '', driver: '' }; renderHome();
+  });
 
   document.getElementById('new').onclick = () => {
     const m = store.newMeeting();
@@ -150,7 +211,7 @@ function renderMeeting(m) {
     <button class="sm back" id="back" aria-label="Back">‹</button>
     <button class="hdr-title" id="details">
       <span class="t">${esc(m.track) || 'Untitled event'}</span>
-      <span class="s">${esc(fmtDate(m.date))}${m.kartClass ? ' · ' + esc(m.kartClass) : ''}</span>
+      <span class="s">${esc(eventSub(m))}</span>
     </button>
     <button class="sm" id="menu" aria-label="More">•••</button>`;
   document.getElementById('back').onclick = () => { location.hash = '#/'; };
@@ -944,9 +1005,11 @@ function openDetails(m, isNew = false) {
   const d = sheet(`
     <form method="dialog" class="sheet-body">
       <h3>${isNew ? 'New event' : 'Event details'}</h3>
-      <label class="field">Track<input name="track" value="${esc(m.track)}" placeholder="e.g. Whilton Mill" autocapitalize="words"></label>
+      <label class="field">Circuit<input name="track" value="${esc(m.track)}" placeholder="e.g. Whilton Mill" autocapitalize="words" list="dl-track"></label>
       <label class="field">Date<input name="date" type="date" value="${esc(m.date)}"></label>
-      <label class="field">Class / kart<input name="kartClass" value="${esc(m.kartClass)}" placeholder="e.g. Junior Rotax" autocapitalize="words"></label>
+      <label class="field">Kart type<input name="kartClass" value="${esc(m.kartClass)}" placeholder="e.g. Senior Max" autocapitalize="words" list="dl-kart"></label>
+      <label class="field">Driver<input name="driver" value="${esc(m.driver || '')}" placeholder="Driver's name" autocapitalize="words" list="dl-driver"></label>
+      ${['track', 'kart', 'driver'].map((k) => `<datalist id="dl-${k}">${distinct(k).map((v) => `<option value="${esc(v)}">`).join('')}</datalist>`).join('')}
       <div class="row"><button class="pri" value="save" style="flex:1">Done</button></div>
     </form>`);
   if (isNew) d.querySelector('[name=track]').focus();
@@ -955,6 +1018,7 @@ function openDetails(m, isNew = false) {
     m.track = fd.get('track').trim();
     m.date = fd.get('date');
     m.kartClass = fd.get('kartClass').trim();
+    m.driver = fd.get('driver').trim();
     touch(m);
     store.save(state, true);
     renderMeeting(m);
@@ -1065,7 +1129,7 @@ function loadSetupSheet(m, s) {
 // Start a new event using the last session with data as the first session's setup.
 function carryForward(m) {
   const last = [...m.sessions].reverse().find((s) => store.sessionHasData(s));
-  const n = store.newMeeting({ track: m.track, kartClass: m.kartClass });
+  const n = store.newMeeting({ track: m.track, kartClass: m.kartClass, driver: m.driver || '' });
   if (last) {
     n.sessions[0].values = store.effectiveAt(m, last);
   }
