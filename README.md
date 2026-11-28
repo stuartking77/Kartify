@@ -42,11 +42,8 @@ full screen and works offline at the track.
 
 ## Publishing to GitHub Pages
 
-Currently served from the `claude/tender-cannon-a36wih` branch (**Settings → Pages → Deploy from a branch**),
-at https://stuartking77.github.io/Kartify/.
-
-If you later move to a `main` branch, set **Source: GitHub Actions** and the workflow in
-`.github/workflows/pages.yml` deploys on every push to `main`.
+The app is served from the `main` branch (**Settings → Pages → Deploy from a branch → main / (root)**)
+at https://stuartking77.github.io/Kartify/. Every push to `main` republishes it.
 
 ## Installing on iPhone
 
